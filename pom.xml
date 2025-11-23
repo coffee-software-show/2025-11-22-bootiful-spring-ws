@@ -79,7 +79,21 @@
                         <source>${project.basedir}/src/main/resources/countries.xsd</source>
                     </sources>
                 </configuration>
-            </plugin>
+	</plugin>
+		<plugin>
+			<groupId>io.spring.javaformat</groupId>
+			<artifactId>spring-javaformat-maven-plugin</artifactId>
+			<version>0.0.47</version>
+			<executions>
+				<execution>
+					<phase>validate</phase>
+					<inherited>true</inherited>
+					<goals>
+						<goal>validate</goal>
+					</goals>
+				</execution>
+			</executions>
+		</plugin>
             <plugin>
                 <groupId>org.graalvm.buildtools</groupId>
                 <artifactId>native-maven-plugin</artifactId>
