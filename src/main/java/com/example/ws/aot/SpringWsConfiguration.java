@@ -97,10 +97,8 @@ class SpringWsConfiguration {
 			return (generationContext, _) -> {
 				var resources = generationContext.getRuntimeHints().resources();
 				for (var wsdlLocation : wsdlLocations) {
-
 					resources.registerPattern(wsdlLocation);
 				}
-
 			};
 		}
 

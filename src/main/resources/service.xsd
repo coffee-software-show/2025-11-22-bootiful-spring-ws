@@ -11,6 +11,16 @@
         </xs:complexType>
     </xs:element>
 
+    <xs:element name="getMeRequest"/>
+
+    <xs:element name="getMeResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="name" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
     <xs:element name="getCountryResponse">
         <xs:complexType>
             <xs:sequence>
