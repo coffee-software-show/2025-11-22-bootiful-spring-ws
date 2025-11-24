@@ -6,6 +6,8 @@ import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
 import org.springframework.aot.hint.TypeReference;
+import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
+import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.ws.WebServiceMessageFactory;
 import org.springframework.ws.server.EndpointAdapter;
 import org.springframework.ws.server.EndpointExceptionResolver;
@@ -16,7 +18,7 @@ import org.springframework.ws.server.endpoint.adapter.AbstractMethodEndpointAdap
 import org.springframework.ws.server.endpoint.adapter.DefaultMethodEndpointAdapter;
 import org.springframework.ws.server.endpoint.adapter.MessageEndpointAdapter;
 import org.springframework.ws.server.endpoint.adapter.PayloadEndpointAdapter;
-import org.springframework.ws.server.endpoint.annotation.*;
+import org.springframework.ws.server.endpoint.annotation.Endpoint;
 import org.springframework.ws.server.endpoint.mapping.PayloadRootAnnotationMethodEndpointMapping;
 import org.springframework.ws.soap.saaj.SaajSoapMessageFactory;
 import org.springframework.ws.soap.server.SoapMessageDispatcher;
@@ -27,6 +29,8 @@ import org.springframework.ws.soap.server.endpoint.adapter.method.SoapMethodArgu
 import org.springframework.ws.soap.server.endpoint.mapping.SoapActionAnnotationMethodEndpointMapping;
 import org.springframework.ws.transport.WebServiceMessageReceiver;
 import org.springframework.ws.transport.http.WebServiceMessageReceiverHandlerAdapter;
+
+import java.util.List;
 
 class SpringWsHints implements RuntimeHintsRegistrar {
 
@@ -52,18 +56,44 @@ class SpringWsHints implements RuntimeHintsRegistrar {
 				"com.ibm.wsdl.extensions.soap.SOAPOperationImpl", "com.ibm.wsdl.factory.WSDLFactoryImpl" })
 			hints.reflection().registerType(TypeReference.of(c), values);
 
+		for (var a : this.findAllClasses(Endpoint.class.getPackageName()))
+			hints.reflection().registerType(TypeReference.of(a), values);
+
 		for (var c : new Class<?>[] { AbstractMethodEndpointAdapter.class, DefaultMethodEndpointAdapter.class,
 				DefaultMethodEndpointAdapter.class, EndpointAdapter.class, EndpointExceptionResolver.class,
-				EndpointMapping.class, MessageEndpointAdapter.class, MethodEndpoint.class, Namespace.class,
-				Namespaces.class, PayloadEndpoint.class, PayloadEndpointAdapter.class, PayloadRoot.class,
-				PayloadRootAnnotationMethodEndpointMapping.class, PayloadRoots.class, RequestPayload.class,
-				ResponsePayload.class, SaajSoapMessageFactory.class, SoapHeaderElementMethodArgumentResolver.class,
+				EndpointMapping.class, MessageEndpointAdapter.class, MethodEndpoint.class, PayloadEndpoint.class,
+				PayloadEndpointAdapter.class, PayloadRootAnnotationMethodEndpointMapping.class,
+				SaajSoapMessageFactory.class, SoapHeaderElementMethodArgumentResolver.class,
 				SimpleSoapExceptionResolver.class, SoapActionAnnotationMethodEndpointMapping.class,
 				SoapMethodArgumentResolver.class, SoapFaultAnnotationExceptionResolver.class,
 				SoapHeaderElementMethodArgumentResolver.class, SoapMessageDispatcher.class,
 				SoapMethodArgumentResolver.class, WebServiceMessageFactory.class, WebServiceMessageReceiver.class,
-				WebServiceMessageReceiverHandlerAdapter.class, XPathParam.class, })
+				WebServiceMessageReceiverHandlerAdapter.class, })
 			hints.reflection().registerType(c, values);
+
+	}
+
+	private List<? extends Class<?>> findAllClasses(String basePackage) {
+		var scanner = new ClassPathScanningCandidateComponentProvider(false) {
+			@Override
+			protected boolean isCandidateComponent(@NonNull AnnotatedBeanDefinition beanDefinition) {
+				return true;
+			}
+		};
+		scanner.addIncludeFilter((_, _) -> true);
+		return scanner //
+			.findCandidateComponents(basePackage) //
+			.stream() //
+			.map(bd -> {
+				try {
+					// IO.println(bd.getBeanClassName());
+					return Class.forName(bd.getBeanClassName());
+				} //
+				catch (ClassNotFoundException e) {
+					throw new RuntimeException(e);
+				}
+			})
+			.toList();
 
 	}
 
