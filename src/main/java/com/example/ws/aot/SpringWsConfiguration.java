@@ -26,7 +26,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Configuration
-@ImportRuntimeHints({ JaxbHints.class, SpringWsHints.class })
+@ImportRuntimeHints({ SpringWsHints.class })
 class SpringWsConfiguration {
 
 	@Bean
