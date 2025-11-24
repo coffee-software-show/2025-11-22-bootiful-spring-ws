@@ -1,14 +1,5 @@
 package com.example.ws.aot;
 
-import com.ibm.wsdl.extensions.schema.SchemaImpl;
-import com.ibm.wsdl.extensions.soap.SOAPAddressImpl;
-import com.ibm.wsdl.extensions.soap.SOAPBindingImpl;
-import com.ibm.wsdl.extensions.soap.SOAPBodyImpl;
-import com.ibm.wsdl.extensions.soap.SOAPOperationImpl;
-import com.ibm.wsdl.extensions.soap12.SOAP12AddressImpl;
-import com.ibm.wsdl.extensions.soap12.SOAP12OperationImpl;
-import com.ibm.wsdl.factory.WSDLFactoryImpl;
-import jakarta.xml.bind.Binder;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.aot.hint.MemberCategory;
@@ -37,8 +28,6 @@ import org.springframework.ws.soap.server.endpoint.mapping.SoapActionAnnotationM
 import org.springframework.ws.transport.WebServiceMessageReceiver;
 import org.springframework.ws.transport.http.WebServiceMessageReceiverHandlerAdapter;
 
-import javax.xml.stream.XMLInputFactory;
-
 /**
  * @author Josh Long
  */
@@ -54,12 +43,6 @@ class SpringWsHints implements RuntimeHintsRegistrar {
 		hints.resources().registerResourceBundle("com.sun.xml.messaging.saaj.util.LocalStrings");
 
 		var values = MemberCategory.values();
-
-		for (var c : new Class<?>[] { SOAP12AddressImpl.class, SOAPOperationImpl.class, Binder.class,
-				XMLInputFactory.class, SchemaImpl.class, SOAPBindingImpl.class, SOAPBodyImpl.class,
-				SOAPAddressImpl.class, SOAP12AddressImpl.class, SOAPOperationImpl.class, SOAP12OperationImpl.class,
-				WSDLFactoryImpl.class, })
-			hints.reflection().registerType(c, MemberCategory.values());
 
 		for (var c : new String[] { "nu.xom.Element", "org.glassfish.jaxb.runtime.v2.runtime.JAXBContextImpl",
 				"org.glassfish.jaxb.runtime.v2.runtime.property.SingleElementNodeProperty", "org.dom4j.Element",

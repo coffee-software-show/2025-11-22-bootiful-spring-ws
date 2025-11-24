@@ -24,7 +24,6 @@ abstract class AotUtils {
 			.stream() //
 			.map(bd -> {
 				try {
-					// IO.println(bd.getBeanClassName());
 					return Class.forName(bd.getBeanClassName());
 				} //
 				catch (ClassNotFoundException e) {
