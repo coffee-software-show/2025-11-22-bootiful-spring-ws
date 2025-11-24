@@ -65,7 +65,7 @@ class CountryRepository {
 	}
 
 	public Country findCountry(String name) {
-		return countries.get(name);
+		return this.countries.get(name);
 	}
 
 }
