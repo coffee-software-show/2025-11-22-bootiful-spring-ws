@@ -2,6 +2,7 @@ package com.example.ws;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Repository;
 import org.springframework.ws.server.endpoint.annotation.Endpoint;
 import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
@@ -32,8 +33,17 @@ class CountryEndpoint {
 	}
 
 	@ResponsePayload
+	@PayloadRoot(namespace = NAMESPACE_URI, localPart = "getMeRequest")
+	GetMeResponse getMe() {
+		var me = SecurityContextHolder.getContext().getAuthentication().getName();
+		var meResponse = new GetMeResponse();
+		meResponse.setName(me);
+		return meResponse;
+	}
+
+	@ResponsePayload
 	@PayloadRoot(namespace = NAMESPACE_URI, localPart = "getCountryRequest")
-	public GetCountryResponse getCountry(@RequestPayload GetCountryRequest request) {
+	GetCountryResponse getCountry(@RequestPayload GetCountryRequest request) {
 		var response = new GetCountryResponse();
 		response.setCountry(this.countryRepository.findCountry(request.getName()));
 		return response;

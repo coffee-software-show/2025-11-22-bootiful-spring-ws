@@ -1,8 +1,11 @@
 package com.example.ws;
 
+import org.jspecify.annotations.NonNull;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -30,24 +33,19 @@ import java.util.Set;
  * {@link PasswordEncoder#matches(CharSequence, String)}, and then teaching Spring WS to
  * reject requests using a {@literal CustomToken} and an OAuth token.
  */
-// @Profile("one")
+@Profile("one")
 @Configuration
-class Security1Configuration {
+class Security1Configuration implements WsConfigurer {
 
-	@Configuration
-	static class SecurityWsConfigurer implements WsConfigurer {
+	private final ObjectProvider<@NonNull Wss4jSecurityInterceptor> securityInterceptors;
 
-		private final Wss4jSecurityInterceptor securityInterceptor;
+	Security1Configuration(ObjectProvider<@NonNull Wss4jSecurityInterceptor> securityInterceptors) {
+		this.securityInterceptors = securityInterceptors;
+	}
 
-		SecurityWsConfigurer(Wss4jSecurityInterceptor securityInterceptor) {
-			this.securityInterceptor = securityInterceptor;
-		}
-
-		@Override
-		public void addInterceptors(List<EndpointInterceptor> interceptors) {
-			interceptors.add(this.securityInterceptor);
-		}
-
+	@Override
+	public void addInterceptors(List<EndpointInterceptor> interceptors) {
+		interceptors.add(securityInterceptors.getIfAvailable());
 	}
 
 	@Bean

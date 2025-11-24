@@ -13,8 +13,10 @@ import org.apache.wss4j.dom.message.token.UsernameToken;
 import org.apache.wss4j.dom.validate.Credential;
 import org.apache.wss4j.dom.validate.Validator;
 import org.apache.xml.security.utils.XMLUtils;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -41,24 +43,23 @@ import org.w3c.dom.Element;
 import java.util.List;
 import java.util.Set;
 
-@Profile("two")
+/**
+ * this demonstrates how to do username and password based authentication with Spring
+ * Security.
+ */
+// @Profile("two")
 @Configuration
-class Security2Configuration {
+class Security2Configuration implements WsConfigurer {
 
-	@Configuration
-	static class SecurityWsConfigurer implements WsConfigurer {
+	private final ObjectProvider<@NonNull Wss4jSecurityInterceptor> securityInterceptors;
 
-		private final Wss4jSecurityInterceptor securityInterceptor;
+	Security2Configuration(ObjectProvider<@NonNull Wss4jSecurityInterceptor> securityInterceptors) {
+		this.securityInterceptors = securityInterceptors;
+	}
 
-		SecurityWsConfigurer(Wss4jSecurityInterceptor securityInterceptor) {
-			this.securityInterceptor = securityInterceptor;
-		}
-
-		@Override
-		public void addInterceptors(List<EndpointInterceptor> interceptors) {
-			interceptors.add(this.securityInterceptor);
-		}
-
+	@Override
+	public void addInterceptors(List<EndpointInterceptor> interceptors) {
+		interceptors.add(securityInterceptors.getIfAvailable());
 	}
 
 	@Bean
@@ -148,8 +149,8 @@ class Security2Configuration {
 				// we'll fall through to the exception thrown below.
 				this.log.warn("couldn't authenticate! {} ", e.getMessage());
 			}
-			throw new WSSecurityException(WSSecurityException.ErrorCode.FAILED_AUTHENTICATION);
 
+			throw new WSSecurityException(WSSecurityException.ErrorCode.FAILED_AUTHENTICATION);
 		}
 
 	}
@@ -160,8 +161,6 @@ class Security2Configuration {
 	@Bean
 	WSSConfig wssConfig(UserDetailsServiceUsernameTokenValidator userDetailsServiceUsernameTokenValidator) {
 		var wssconfig = WSSConfig.getNewInstance();
-		// todo set UsernameTokenValidator to be something that knows
-		// about Spring Security's PasswordEncoder setup.
 		wssconfig.setValidator(WSConstants.USERNAME_TOKEN, userDetailsServiceUsernameTokenValidator);
 		return wssconfig;
 	}
@@ -176,7 +175,6 @@ class Security2Configuration {
 	@Bean
 	Wss4jSecurityInterceptor wss4jSecurityInterceptor(WSSecurityEngine wsSecurityEngine,
 			SpringSecurityPasswordValidationCallbackHandler handler) {
-
 		var ws4jsi = new Wss4jSecurityInterceptor(wsSecurityEngine);
 		ws4jsi.setValidationActions("UsernameToken");
 		ws4jsi.setValidationCallbackHandler(handler);
