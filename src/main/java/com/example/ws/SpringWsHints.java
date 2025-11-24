@@ -1,5 +1,14 @@
 package com.example.ws;
 
+import com.ibm.wsdl.extensions.schema.SchemaImpl;
+import com.ibm.wsdl.extensions.soap.SOAPAddressImpl;
+import com.ibm.wsdl.extensions.soap.SOAPBindingImpl;
+import com.ibm.wsdl.extensions.soap.SOAPBodyImpl;
+import com.ibm.wsdl.extensions.soap.SOAPOperationImpl;
+import com.ibm.wsdl.extensions.soap12.SOAP12AddressImpl;
+import com.ibm.wsdl.extensions.soap12.SOAP12OperationImpl;
+import com.ibm.wsdl.factory.WSDLFactoryImpl;
+import jakarta.xml.bind.Binder;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.aot.hint.MemberCategory;
@@ -30,6 +39,7 @@ import org.springframework.ws.soap.server.endpoint.mapping.SoapActionAnnotationM
 import org.springframework.ws.transport.WebServiceMessageReceiver;
 import org.springframework.ws.transport.http.WebServiceMessageReceiverHandlerAdapter;
 
+import javax.xml.stream.XMLInputFactory;
 import java.util.List;
 
 class SpringWsHints implements RuntimeHintsRegistrar {
@@ -45,15 +55,16 @@ class SpringWsHints implements RuntimeHintsRegistrar {
 
 		var values = MemberCategory.values();
 
-		for (var c : new String[] { "org.dom4j.Element", "jakarta.xml.bind.Binder", "org.jdom2.Element",
-				"javax.xml.stream.XMLInputFactory", "nu.xom.Element", "com.ibm.wsdl.extensions.schema.SchemaImpl",
-				"com.ibm.wsdl.extensions.soap.SOAPBindingImpl",
-				"org.glassfish.jaxb.runtime.v2.runtime.property.SingleElementNodeProperty",
-				"org.glassfish.jaxb.runtime.v2.runtime.JAXBContextImpl",
-				"org.glassfish.jaxb.runtime.v2.model.runtime.RuntimeElementPropertyInfo",
+		for (var c : new Class<?>[] { SOAP12AddressImpl.class, SOAPOperationImpl.class, Binder.class,
+				XMLInputFactory.class, SchemaImpl.class, SOAPBindingImpl.class, SOAPBodyImpl.class,
+				SOAPAddressImpl.class, SOAP12AddressImpl.class, SOAPOperationImpl.class, SOAP12OperationImpl.class,
+				WSDLFactoryImpl.class, })
+			hints.reflection().registerType(c, MemberCategory.values());
+
+		for (var c : new String[] { "nu.xom.Element", "org.glassfish.jaxb.runtime.v2.runtime.JAXBContextImpl",
+				"org.glassfish.jaxb.runtime.v2.runtime.property.SingleElementNodeProperty", "org.dom4j.Element",
 				"com.sun.org.apache.xpath.internal.functions.FuncNormalizeSpace",
-				"com.ibm.wsdl.extensions.soap.SOAPBodyImpl", "com.ibm.wsdl.extensions.soap.SOAPAddressImpl",
-				"com.ibm.wsdl.extensions.soap.SOAPOperationImpl", "com.ibm.wsdl.factory.WSDLFactoryImpl" })
+				"org.glassfish.jaxb.runtime.v2.model.runtime.RuntimeElementPropertyInfo", "org.jdom2.Element" })
 			hints.reflection().registerType(TypeReference.of(c), values);
 
 		for (var a : this.findAllClasses(Endpoint.class.getPackageName()))
