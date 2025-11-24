@@ -6,6 +6,9 @@ import org.springframework.context.annotation.ClassPathScanningCandidateComponen
 
 import java.util.List;
 
+/**
+ * @author Josh Long
+ */
 abstract class AotUtils {
 
 	static List<? extends Class<?>> findAllClasses(String basePackage) {

@@ -39,6 +39,9 @@ import org.springframework.ws.transport.http.WebServiceMessageReceiverHandlerAda
 
 import javax.xml.stream.XMLInputFactory;
 
+/**
+ * @author Josh Long
+ */
 class SpringWsHints implements RuntimeHintsRegistrar {
 
 	@Override

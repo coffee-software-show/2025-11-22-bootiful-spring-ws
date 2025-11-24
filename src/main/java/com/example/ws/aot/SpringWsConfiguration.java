@@ -25,6 +25,9 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
+/**
+ * @author Josh Long
+ */
 @Configuration
 @ImportRuntimeHints({ SpringWsHints.class })
 class SpringWsConfiguration {
