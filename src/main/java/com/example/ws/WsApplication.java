@@ -10,6 +10,7 @@ import org.springframework.ws.server.endpoint.annotation.RequestPayload;
 import org.springframework.ws.server.endpoint.annotation.ResponsePayload;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 @SpringBootApplication
@@ -18,7 +19,6 @@ public class WsApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(WsApplication.class, args);
 	}
-
 }
 
 @Endpoint
@@ -35,7 +35,7 @@ class CountryEndpoint {
 	@ResponsePayload
 	@PayloadRoot(namespace = NAMESPACE_URI, localPart = "getMeRequest")
 	GetMeResponse getMe() {
-		var me = SecurityContextHolder.getContext().getAuthentication().getName();
+		var me = Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getName();
 		var meResponse = new GetMeResponse();
 		meResponse.setName(me);
 		return meResponse;
