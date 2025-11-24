@@ -17,27 +17,7 @@ import org.springframework.context.annotation.ImportRuntimeHints;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.Assert;
-import org.springframework.ws.WebServiceMessageFactory;
-import org.springframework.ws.server.EndpointAdapter;
-import org.springframework.ws.server.EndpointExceptionResolver;
-import org.springframework.ws.server.EndpointMapping;
-import org.springframework.ws.server.endpoint.MethodEndpoint;
-import org.springframework.ws.server.endpoint.PayloadEndpoint;
-import org.springframework.ws.server.endpoint.adapter.AbstractMethodEndpointAdapter;
-import org.springframework.ws.server.endpoint.adapter.DefaultMethodEndpointAdapter;
-import org.springframework.ws.server.endpoint.adapter.MessageEndpointAdapter;
-import org.springframework.ws.server.endpoint.adapter.PayloadEndpointAdapter;
 import org.springframework.ws.server.endpoint.annotation.*;
-import org.springframework.ws.server.endpoint.mapping.PayloadRootAnnotationMethodEndpointMapping;
-import org.springframework.ws.soap.saaj.SaajSoapMessageFactory;
-import org.springframework.ws.soap.server.SoapMessageDispatcher;
-import org.springframework.ws.soap.server.endpoint.SimpleSoapExceptionResolver;
-import org.springframework.ws.soap.server.endpoint.SoapFaultAnnotationExceptionResolver;
-import org.springframework.ws.soap.server.endpoint.adapter.method.SoapHeaderElementMethodArgumentResolver;
-import org.springframework.ws.soap.server.endpoint.adapter.method.SoapMethodArgumentResolver;
-import org.springframework.ws.soap.server.endpoint.mapping.SoapActionAnnotationMethodEndpointMapping;
-import org.springframework.ws.transport.WebServiceMessageReceiver;
-import org.springframework.ws.transport.http.WebServiceMessageReceiverHandlerAdapter;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -64,7 +44,7 @@ class SecurityConfiguration {
 }
 
 @Configuration
-@ImportRuntimeHints({ WsConfiguration.SpringWsHints.class, WsConfiguration.CountryHints.class })
+@ImportRuntimeHints({ SpringWsHints.class, CountryHints.class })
 class WsConfiguration {
 
 	@Bean
@@ -95,60 +75,19 @@ class WsConfiguration {
 
 	}
 
-	static class CountryHints implements RuntimeHintsRegistrar {
+}
 
-		@Override
-		public void registerHints(RuntimeHints hints, @Nullable ClassLoader classLoader) {
-			hints.resources().registerResource(new ClassPathResource("countries.xsd"));
+class CountryHints implements RuntimeHintsRegistrar {
 
-			var values = MemberCategory.values();
+	@Override
+	public void registerHints(RuntimeHints hints, @Nullable ClassLoader classLoader) {
+		hints.resources().registerResource(new ClassPathResource("countries.xsd"));
 
-			for (var c : new Class<?>[] { Country.class, Currency.class, GetCountryRequest.class,
-					GetCountryResponse.class, ObjectFactory.class })
-				hints.reflection().registerType(c, values);
-		}
+		var values = MemberCategory.values();
 
-	}
-
-	static class SpringWsHints implements RuntimeHintsRegistrar {
-
-		@Override
-		public void registerHints(RuntimeHints hints, @Nullable ClassLoader classLoader) {
-
-			for (var config : new String[] { "org/springframework/ws/soap/server/SoapMessageDispatcher.properties",
-					"org/springframework/ws/transport/http/MessageDispatcherServlet.properties" })
-				hints.resources().registerPattern(config);
-
-			hints.resources().registerResourceBundle("com.sun.xml.messaging.saaj.util.LocalStrings");
-
-			var values = MemberCategory.values();
-
-			for (var c : new String[] { "org.dom4j.Element", "jakarta.xml.bind.Binder", "org.jdom2.Element",
-					"javax.xml.stream.XMLInputFactory", "nu.xom.Element", "com.ibm.wsdl.extensions.schema.SchemaImpl",
-					"com.ibm.wsdl.extensions.soap.SOAPBindingImpl",
-					"org.glassfish.jaxb.runtime.v2.runtime.property.SingleElementNodeProperty",
-					"org.glassfish.jaxb.runtime.v2.runtime.JAXBContextImpl",
-					"org.glassfish.jaxb.runtime.v2.model.runtime.RuntimeElementPropertyInfo",
-					"com.sun.org.apache.xpath.internal.functions.FuncNormalizeSpace",
-					"com.ibm.wsdl.extensions.soap.SOAPBodyImpl", "com.ibm.wsdl.extensions.soap.SOAPAddressImpl",
-					"com.ibm.wsdl.extensions.soap.SOAPOperationImpl", "com.ibm.wsdl.factory.WSDLFactoryImpl" })
-				hints.reflection().registerType(TypeReference.of(c), values);
-
-			for (var c : new Class<?>[] { AbstractMethodEndpointAdapter.class, DefaultMethodEndpointAdapter.class,
-					DefaultMethodEndpointAdapter.class, EndpointAdapter.class, EndpointExceptionResolver.class,
-					EndpointMapping.class, MessageEndpointAdapter.class, MethodEndpoint.class, Namespace.class,
-					Namespaces.class, PayloadEndpoint.class, PayloadEndpointAdapter.class, PayloadRoot.class,
-					PayloadRootAnnotationMethodEndpointMapping.class, PayloadRoots.class, RequestPayload.class,
-					ResponsePayload.class, SaajSoapMessageFactory.class, SoapHeaderElementMethodArgumentResolver.class,
-					SimpleSoapExceptionResolver.class, SoapActionAnnotationMethodEndpointMapping.class,
-					SoapMethodArgumentResolver.class, SoapFaultAnnotationExceptionResolver.class,
-					SoapHeaderElementMethodArgumentResolver.class, SoapMessageDispatcher.class,
-					SoapMethodArgumentResolver.class, WebServiceMessageFactory.class, WebServiceMessageReceiver.class,
-					WebServiceMessageReceiverHandlerAdapter.class, XPathParam.class, })
-				hints.reflection().registerType(c, values);
-
-		}
-
+		for (var c : new Class<?>[] { Country.class, Currency.class, GetCountryRequest.class, GetCountryResponse.class,
+				ObjectFactory.class })
+			hints.reflection().registerType(c, values);
 	}
 
 }
