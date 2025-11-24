@@ -43,10 +43,10 @@
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
             <scope>test</scope>
         </dependency>
-<!--        <dependency>
-            <groupId>org.springframework.ws</groupId>
-            <artifactId>spring-ws-core</artifactId>
-        </dependency>-->
+        <!--        <dependency>
+                    <groupId>org.springframework.ws</groupId>
+                    <artifactId>spring-ws-core</artifactId>
+                </dependency>-->
         <dependency>
             <groupId>wsdl4j</groupId>
             <artifactId>wsdl4j</artifactId>
@@ -83,21 +83,21 @@
                         <source>${project.basedir}/src/main/resources/countries.xsd</source>
                     </sources>
                 </configuration>
-	</plugin>
-		<plugin>
-			<groupId>io.spring.javaformat</groupId>
-			<artifactId>spring-javaformat-maven-plugin</artifactId>
-			<version>0.0.47</version>
-			<executions>
-				<execution>
-					<phase>validate</phase>
-					<inherited>true</inherited>
-					<goals>
-						<goal>validate</goal>
-					</goals>
-				</execution>
-			</executions>
-		</plugin>
+            </plugin>
+            <plugin>
+                <groupId>io.spring.javaformat</groupId>
+                <artifactId>spring-javaformat-maven-plugin</artifactId>
+                <version>0.0.47</version>
+                <executions>
+                    <execution>
+                        <phase>validate</phase>
+                        <inherited>true</inherited>
+                        <goals>
+                            <goal>validate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.graalvm.buildtools</groupId>
                 <artifactId>native-maven-plugin</artifactId>

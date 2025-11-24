@@ -1,24 +1,7 @@
 package com.example.ws;
 
-import io.spring.guides.gs_producing_web_service.*;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
-import org.springframework.aot.hint.MemberCategory;
-import org.springframework.aot.hint.RuntimeHints;
-import org.springframework.aot.hint.RuntimeHintsRegistrar;
-import org.springframework.aot.hint.TypeReference;
-import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
-import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContribution;
-import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor;
-import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
-import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.ImportRuntimeHints;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.Assert;
 import org.springframework.ws.server.endpoint.annotation.Endpoint;
@@ -26,14 +9,9 @@ import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
 import org.springframework.ws.server.endpoint.annotation.RequestPayload;
 import org.springframework.ws.server.endpoint.annotation.ResponsePayload;
 
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-//
-// working through https://spring.io/guides/gs/producing-web-service
-//
 @SpringBootApplication
 public class WsApplication {
 
@@ -43,72 +21,10 @@ public class WsApplication {
 
 }
 
-@Configuration
-class ComponentScannerConfiguration {
-
-}
-
-@Configuration
-class SecurityConfiguration {
-
-	// todo make this work with Spring Boot
-	// todo make this work with Security
-
-}
-
-@Configuration
-@ImportRuntimeHints({ SpringWsHints.class, CountryHints.class })
-class WsConfiguration {
-
-	@Bean
-	static EndpointBeanFactoryInitializationAotProcessor endpointBeanFactoryInitializationAotProcessor() {
-		return new EndpointBeanFactoryInitializationAotProcessor();
-	}
-
-	static class EndpointBeanFactoryInitializationAotProcessor implements BeanFactoryInitializationAotProcessor {
-
-		@Override
-		public @Nullable BeanFactoryInitializationAotContribution processAheadOfTime(
-				ConfigurableListableBeanFactory beanFactory) {
-
-			var endpoints = new HashSet<TypeReference>();
-			var beanNamesForAnnotation = beanFactory.getBeanNamesForAnnotation(Endpoint.class);
-			for (var beanName : beanNamesForAnnotation) {
-				var type = beanFactory.getType(beanName);
-				Assert.notNull(type, "the type for beanName " + beanName + " not found");
-				endpoints.add(TypeReference.of(type));
-			}
-			return (generationContext, _) -> {
-				var runtimeHints = generationContext.getRuntimeHints().reflection();
-				for (var tr : endpoints) {
-					runtimeHints.registerType(tr, MemberCategory.values());
-				}
-			};
-		}
-
-	}
-
-}
-
-class CountryHints implements RuntimeHintsRegistrar {
-
-	@Override
-	public void registerHints(RuntimeHints hints, @Nullable ClassLoader classLoader) {
-		hints.resources().registerResource(new ClassPathResource("countries.xsd"));
-
-		var values = MemberCategory.values();
-
-		for (var c : new Class<?>[] { Country.class, Currency.class, GetCountryRequest.class, GetCountryResponse.class,
-				ObjectFactory.class })
-			hints.reflection().registerType(c, values);
-	}
-
-}
-
 @Endpoint
 class CountryEndpoint {
 
-	private static final String NAMESPACE_URI = "http://spring.io/guides/gs-producing-web-service";
+	private static final String NAMESPACE_URI = "http://example.com/ws";
 
 	private final CountryRepository countryRepository;
 
@@ -116,8 +32,8 @@ class CountryEndpoint {
 		this.countryRepository = countryRepository;
 	}
 
-	@PayloadRoot(namespace = NAMESPACE_URI, localPart = "getCountryRequest")
 	@ResponsePayload
+	@PayloadRoot(namespace = NAMESPACE_URI, localPart = "getCountryRequest")
 	public GetCountryResponse getCountry(@RequestPayload GetCountryRequest request) {
 		var response = new GetCountryResponse();
 		response.setCountry(this.countryRepository.findCountry(request.getName()));

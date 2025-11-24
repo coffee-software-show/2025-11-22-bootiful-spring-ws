@@ -1,4 +1,4 @@
-package com.example.ws;
+package com.example.ws.aot;
 
 import com.ibm.wsdl.extensions.schema.SchemaImpl;
 import com.ibm.wsdl.extensions.soap.SOAPAddressImpl;
@@ -15,8 +15,6 @@ import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
 import org.springframework.aot.hint.TypeReference;
-import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
-import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.ws.WebServiceMessageFactory;
 import org.springframework.ws.server.EndpointAdapter;
 import org.springframework.ws.server.EndpointExceptionResolver;
@@ -40,7 +38,6 @@ import org.springframework.ws.transport.WebServiceMessageReceiver;
 import org.springframework.ws.transport.http.WebServiceMessageReceiverHandlerAdapter;
 
 import javax.xml.stream.XMLInputFactory;
-import java.util.List;
 
 class SpringWsHints implements RuntimeHintsRegistrar {
 
@@ -67,7 +64,7 @@ class SpringWsHints implements RuntimeHintsRegistrar {
 				"org.glassfish.jaxb.runtime.v2.model.runtime.RuntimeElementPropertyInfo", "org.jdom2.Element" })
 			hints.reflection().registerType(TypeReference.of(c), values);
 
-		for (var a : this.findAllClasses(Endpoint.class.getPackageName()))
+		for (var a : AotUtils.findAllClasses(Endpoint.class.getPackageName()))
 			hints.reflection().registerType(TypeReference.of(a), values);
 
 		for (var c : new Class<?>[] { AbstractMethodEndpointAdapter.class, DefaultMethodEndpointAdapter.class,
@@ -81,30 +78,6 @@ class SpringWsHints implements RuntimeHintsRegistrar {
 				SoapMethodArgumentResolver.class, WebServiceMessageFactory.class, WebServiceMessageReceiver.class,
 				WebServiceMessageReceiverHandlerAdapter.class, })
 			hints.reflection().registerType(c, values);
-
-	}
-
-	private List<? extends Class<?>> findAllClasses(String basePackage) {
-		var scanner = new ClassPathScanningCandidateComponentProvider(false) {
-			@Override
-			protected boolean isCandidateComponent(@NonNull AnnotatedBeanDefinition beanDefinition) {
-				return true;
-			}
-		};
-		scanner.addIncludeFilter((_, _) -> true);
-		return scanner //
-			.findCandidateComponents(basePackage) //
-			.stream() //
-			.map(bd -> {
-				try {
-					// IO.println(bd.getBeanClassName());
-					return Class.forName(bd.getBeanClassName());
-				} //
-				catch (ClassNotFoundException e) {
-					throw new RuntimeException(e);
-				}
-			})
-			.toList();
 
 	}
 
