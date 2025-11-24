@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
-./mvnw -DskipTests -Pnative native:compile 
+./mvnw spring-javaformat:apply
+./mvnw -DskipTests -Pnative native:compile
 ./target/ws

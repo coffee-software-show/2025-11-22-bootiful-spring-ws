@@ -15,6 +15,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.ImportRuntimeHints;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
@@ -46,6 +47,7 @@ import org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition;
 import org.springframework.xml.xsd.SimpleXsdSchema;
 import org.springframework.xml.xsd.XsdSchema;
 
+import java.net.PasswordAuthentication;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -53,39 +55,26 @@ import java.util.concurrent.ConcurrentHashMap;
 //
 // working through https://spring.io/guides/gs/producing-web-service
 //
-@ImportRuntimeHints(WsApplication.Hints.class)
 @SpringBootApplication
 public class WsApplication {
-
-	private static final Resource COUNTRIES_RESOURCE = new ClassPathResource("countries.xsd");
 
 	public static void main(String[] args) {
 		SpringApplication.run(WsApplication.class, args);
 	}
 
-	@Bean
-	ServletRegistrationBean<@NonNull MessageDispatcherServlet> messageDispatcherServlet(
-			ApplicationContext applicationContext) {
-		var servlet = new MessageDispatcherServlet();
-		servlet.setApplicationContext(applicationContext);
-		servlet.setTransformWsdlLocations(true);
-		return new ServletRegistrationBean<>(servlet, "/ws/*");
-	}
+}
 
-	@Bean(name = "countries")
-	DefaultWsdl11Definition defaultWsdl11Definition(XsdSchema countriesSchema) {
-		var wsdl11Definition = new DefaultWsdl11Definition();
-		wsdl11Definition.setPortTypeName("CountriesPort");
-		wsdl11Definition.setLocationUri("/ws");
-		wsdl11Definition.setTargetNamespace("http://spring.io/guides/gs-producing-web-service");
-		wsdl11Definition.setSchema(countriesSchema);
-		return wsdl11Definition;
-	}
+@Configuration
+class SecurityConfiguration {
 
-	@Bean
-	XsdSchema countriesSchema() {
-		return new SimpleXsdSchema(COUNTRIES_RESOURCE);
-	}
+	// todo make this work with Spring Boot
+	// todo make this work with Security
+
+}
+
+@Configuration
+@ImportRuntimeHints(WsConfiguration.Hints.class)
+class WsConfiguration {
 
 	@Bean
 	static EndpointBeanFactoryInitializationAotProcessor endpointBeanFactoryInitializationAotProcessor() {
@@ -120,10 +109,8 @@ public class WsApplication {
 		@Override
 		public void registerHints(RuntimeHints hints, @Nullable ClassLoader classLoader) {
 
-			hints.resources().registerResource(COUNTRIES_RESOURCE);
-			for (var config : new String[] {
-
-					"org/springframework/ws/soap/server/SoapMessageDispatcher.properties",
+			hints.resources().registerResource(new ClassPathResource("countries.xsd"));
+			for (var config : new String[] { "org/springframework/ws/soap/server/SoapMessageDispatcher.properties",
 					"org/springframework/ws/transport/http/MessageDispatcherServlet.properties" })
 				hints.resources().registerPattern(config);
 
@@ -137,6 +124,7 @@ public class WsApplication {
 					"org.glassfish.jaxb.runtime.v2.runtime.property.SingleElementNodeProperty",
 					"org.glassfish.jaxb.runtime.v2.runtime.JAXBContextImpl",
 					"org.glassfish.jaxb.runtime.v2.model.runtime.RuntimeElementPropertyInfo",
+					"com.sun.org.apache.xpath.internal.functions.FuncNormalizeSpace",
 					"com.ibm.wsdl.extensions.soap.SOAPBodyImpl", "com.ibm.wsdl.extensions.soap.SOAPAddressImpl",
 					"com.ibm.wsdl.extensions.soap.SOAPOperationImpl", "com.ibm.wsdl.factory.WSDLFactoryImpl" })
 				hints.reflection().registerType(TypeReference.of(c), values);
@@ -153,7 +141,6 @@ public class WsApplication {
 					SoapMethodArgumentResolver.class, WebServiceMessageFactory.class, WebServiceMessageReceiver.class,
 					WebServiceMessageReceiverHandlerAdapter.class, XPathParam.class, })
 				hints.reflection().registerType(c, values);
-
 			for (var c : new Class<?>[] { Country.class, Currency.class, GetCountryRequest.class,
 					GetCountryResponse.class, ObjectFactory.class })
 				hints.reflection().registerType(c, values);
