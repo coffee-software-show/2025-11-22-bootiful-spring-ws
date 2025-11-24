@@ -155,9 +155,6 @@ class Security2Configuration implements WsConfigurer {
 
 	}
 
-	// need to configure this to have the correct kind of UsernameTokenValidator
-	// this gets passed to the WSSecurityEngine
-
 	@Bean
 	WSSConfig wssConfig(UserDetailsServiceUsernameTokenValidator userDetailsServiceUsernameTokenValidator) {
 		var wssconfig = WSSConfig.getNewInstance();

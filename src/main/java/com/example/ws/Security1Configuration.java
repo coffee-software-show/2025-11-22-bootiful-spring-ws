@@ -29,7 +29,8 @@ import java.util.Set;
  * <p>
  * BUT IT REQUIRES to <EM>plaintext</EM>! Not good.
  * <p>
- * Going to try teaching Spring WS to reject requests using a {@literal CustomToken} and an OAuth token.
+ * Going to try teaching Spring WS to reject requests using a {@literal CustomToken} and
+ * an OAuth token.
  */
 @Profile("one")
 @Configuration
