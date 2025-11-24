@@ -1,7 +1,6 @@
 package com.example.ws;
 
 import io.spring.guides.gs_producing_web_service.*;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
@@ -12,13 +11,10 @@ import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcess
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.web.servlet.ServletRegistrationBean;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.ImportRuntimeHints;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.Assert;
 import org.springframework.ws.WebServiceMessageFactory;
@@ -41,13 +37,8 @@ import org.springframework.ws.soap.server.endpoint.adapter.method.SoapHeaderElem
 import org.springframework.ws.soap.server.endpoint.adapter.method.SoapMethodArgumentResolver;
 import org.springframework.ws.soap.server.endpoint.mapping.SoapActionAnnotationMethodEndpointMapping;
 import org.springframework.ws.transport.WebServiceMessageReceiver;
-import org.springframework.ws.transport.http.MessageDispatcherServlet;
 import org.springframework.ws.transport.http.WebServiceMessageReceiverHandlerAdapter;
-import org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition;
-import org.springframework.xml.xsd.SimpleXsdSchema;
-import org.springframework.xml.xsd.XsdSchema;
 
-import java.net.PasswordAuthentication;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -73,7 +64,7 @@ class SecurityConfiguration {
 }
 
 @Configuration
-@ImportRuntimeHints(WsConfiguration.Hints.class)
+@ImportRuntimeHints({ WsConfiguration.SpringWsHints.class, WsConfiguration.CountryHints.class })
 class WsConfiguration {
 
 	@Bean
@@ -104,12 +95,26 @@ class WsConfiguration {
 
 	}
 
-	static class Hints implements RuntimeHintsRegistrar {
+	static class CountryHints implements RuntimeHintsRegistrar {
+
+		@Override
+		public void registerHints(RuntimeHints hints, @Nullable ClassLoader classLoader) {
+			hints.resources().registerResource(new ClassPathResource("countries.xsd"));
+
+			var values = MemberCategory.values();
+
+			for (var c : new Class<?>[] { Country.class, Currency.class, GetCountryRequest.class,
+					GetCountryResponse.class, ObjectFactory.class })
+				hints.reflection().registerType(c, values);
+		}
+
+	}
+
+	static class SpringWsHints implements RuntimeHintsRegistrar {
 
 		@Override
 		public void registerHints(RuntimeHints hints, @Nullable ClassLoader classLoader) {
 
-			hints.resources().registerResource(new ClassPathResource("countries.xsd"));
 			for (var config : new String[] { "org/springframework/ws/soap/server/SoapMessageDispatcher.properties",
 					"org/springframework/ws/transport/http/MessageDispatcherServlet.properties" })
 				hints.resources().registerPattern(config);
@@ -140,9 +145,6 @@ class WsConfiguration {
 					SoapHeaderElementMethodArgumentResolver.class, SoapMessageDispatcher.class,
 					SoapMethodArgumentResolver.class, WebServiceMessageFactory.class, WebServiceMessageReceiver.class,
 					WebServiceMessageReceiverHandlerAdapter.class, XPathParam.class, })
-				hints.reflection().registerType(c, values);
-			for (var c : new Class<?>[] { Country.class, Currency.class, GetCountryRequest.class,
-					GetCountryResponse.class, ObjectFactory.class })
 				hints.reflection().registerType(c, values);
 
 		}
