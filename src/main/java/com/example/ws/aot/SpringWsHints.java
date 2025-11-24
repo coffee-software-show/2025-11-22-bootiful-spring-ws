@@ -1,6 +1,7 @@
 package com.example.ws.aot;
 
 import org.apache.wss4j.dom.engine.WSSConfig;
+import org.apache.wss4j.dom.transform.AttachmentCiphertextTransform;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -64,6 +65,8 @@ class SpringWsHints implements RuntimeHintsRegistrar {
 		for (var c : new String[] { "nu.xom.Element", "org.glassfish.jaxb.runtime.v2.runtime.JAXBContextImpl",
 				"org.glassfish.jaxb.runtime.v2.runtime.property.SingleElementNodeProperty", "org.dom4j.Element",
 				"com.sun.org.apache.xpath.internal.functions.FuncNormalizeSpace",
+				"com.sun.xml.internal.messaging.saaj.soap.SOAPDocumentImpl",
+				"com.sun.xml.messaging.saaj.soap.SOAPDocumentImpl",
 				"org.glassfish.jaxb.runtime.v2.model.runtime.RuntimeElementPropertyInfo", "org.jdom2.Element" })
 			hints.reflection().registerType(TypeReference.of(c), values);
 
@@ -104,6 +107,9 @@ class SpringWsHints implements RuntimeHintsRegistrar {
 
 	private void registerWssConfigClasses(RuntimeHints hints) {
 		var instance = WSSConfig.getNewInstance();
+
+		hints.reflection().registerType(AttachmentCiphertextTransform.class, MemberCategory.values());
+
 		for (var fieldName : new String[] { "actionMap", "processorMap", "validatorMap" })
 			this.registerWssConfigType(instance, fieldName, hints);
 	}
