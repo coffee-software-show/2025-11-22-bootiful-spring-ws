@@ -23,17 +23,11 @@ public class AuthApplication {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
-//    @Bean
-//    JdbcUserDetailsManager jdbcUserDetailsManager(DataSource dataSource) {
-//        var u = new JdbcUserDetailsManager(dataSource);
-//        u.setEnableUpdatePassword(true);
-//        return u;
-//    }
-
     @Bean
     InMemoryUserDetailsManager inMemoryUserDetailsManager(PasswordEncoder pw) {
         return new InMemoryUserDetailsManager(
                 User.withUsername("josh").password(pw.encode("pw")).roles("ADMIN", "USER").build(),
+                User.withUsername("rob").password(pw.encode("pw")).roles("USER").build(),
                 User.withUsername("james").password(pw.encode("pw")).roles("ADMIN", "USER").build()
         );
     }

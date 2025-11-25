@@ -31,9 +31,9 @@ class MeEndpoint {
 
     @ResponsePayload
     @PayloadRoot(namespace = NAMESPACE_URI, localPart = "getMeRequest")
-    GetMeResponse getMe(@SoapHeader("{http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd}Security") SoapHeaderElement securityHeader) {
-        IO.println(securityHeader.toString());
+    GetMeResponse getMe() {
         var me = Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getName();
+        IO.println("authenticated request for " + me);
         var meResponse = new GetMeResponse();
         meResponse.setName(me);
         return meResponse;
