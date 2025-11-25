@@ -16,16 +16,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationProvider;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.ws.config.annotation.WsConfigurer;
 import org.springframework.ws.server.EndpointInterceptor;
 import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityInterceptor;
-import org.springframework.ws.soap.security.wss4j2.callback.SpringSecurityPasswordValidationCallbackHandler;
 import org.w3c.dom.Element;
 
 import javax.xml.namespace.QName;
@@ -36,25 +30,6 @@ import java.util.List;
 import static com.example.ws.OAuthTokenProcessor.OAUTH_TOKEN_QNAME;
 import static org.apache.wss4j.dom.WSConstants.CUSTOM_TOKEN;
 
-/*@Configuration
-class JwtConfiguration {
-
-    @Bean
-    JwtAuthenticationProvider jwtAuthenticationProvider(JwtDecoder decoder) {
-        return new JwtAuthenticationProvider(decoder);
-    }
-
-    @Bean
-    JwtDecoder jwtDecoder(@Value("${spring.security.oauth2.authorizationserver.issuer}") String issuerUri) {
-        return NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
-    }
-
-    @Bean
-    JwtAuthenticationConverter jwtAuthenticationConverter() {
-        return new JwtAuthenticationConverter();
-    }
-
-}*/
 
 /**
  * this demonstrates how to do OAuth token based authentication with Spring Security.
@@ -88,36 +63,6 @@ class Security3Configuration implements WsConfigurer {
                 .build();
     }
 
-/*    @Bean
-    SpringSecurityPasswordValidationCallbackHandler springSecurityPasswordValidationCallbackHandler(
-            UserDetailsService service) {
-        var security = new SpringSecurityPasswordValidationCallbackHandler();
-        security.setUserDetailsService(service);
-        return security;
-    }*/
-
-
-    /*
-     * private Authentication validate(String token) { var auth =
-     * this.jwtAuthenticationProvider.authenticate(new
-     * BearerTokenAuthenticationToken(token)); if (auth != null &&
-     * auth.isAuthenticated()) { return UsernamePasswordAuthenticationToken
-     * .authenticated(Objects.requireNonNull(auth).getName(), null,
-     * AuthorityUtils.NO_AUTHORITIES); } return null; }
-     *
-     * private Credential doValidate(Credential credential, RequestData requestData)
-     * throws WSSecurityException { try { var credentialUsernametoken =
-     * credential.getUsernametoken(); var pw = credentialUsernametoken.getPassword();
-     * var validate = this.validate(pw); if (validate != null) {
-     * SecurityContextHolder.getContext().setAuthentication(validate); return
-     * credential; } } // catch (UsernameNotFoundException e) { // we'll fall through
-     * to the exception thrown below. this.log.warn("couldn't authenticate! {} ",
-     * e.getMessage()); }
-     *
-     * throw new
-     * WSSecurityException(WSSecurityException.ErrorCode.FAILED_AUTHENTICATION); }
-     */
-
     @Bean
     WSSConfig wssConfig(OAuthTokenProcessor processor, OAuthTokenValidator validator) {
         var wssconfig = WSSConfig.getNewInstance();
@@ -136,9 +81,7 @@ class Security3Configuration implements WsConfigurer {
     @Bean
     Wss4jSecurityInterceptor wss4jSecurityInterceptor(WSSecurityEngine wsSecurityEngine) {
         var ws4jsi = new Wss4jSecurityInterceptor(wsSecurityEngine);
-        ws4jsi.setValidationActions("NoSecurity");
-//        ws4jsi.setValidationActions("CustomToken");
-//        ws4jsi.setSkipValidationIfNoHeaderPresent(false);
+        ws4jsi.setValidationActions("CustomToken");
         return ws4jsi;
     }
 
@@ -152,8 +95,6 @@ class Security3Configuration implements WsConfigurer {
         return new OAuthTokenValidator();
     }
 }
-
-
 
 class OAuthTokenProcessor implements Processor {
 
