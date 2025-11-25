@@ -24,7 +24,10 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.client.RestClient;
 import org.springframework.ws.client.core.WebServiceTemplate;
 import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityInterceptor;
+import org.springframework.xml.transform.StringResult;
 
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.dom.DOMSource;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Objects;
@@ -53,8 +56,9 @@ class Client2Configuration {
     Customizer<HttpSecurity> httpSecurityCustomizer() {
         return httpSecurity -> httpSecurity
                 .authorizeHttpRequests(a -> a
-                    .requestMatchers("/ws").permitAll()
-                   // .anyRequest().authenticated()
+                                .requestMatchers("/ws").permitAll()
+                                .requestMatchers("/secure").permitAll()
+                        // .anyRequest().authenticated()
                 );
     }
 
@@ -111,6 +115,20 @@ class ClientController {
         catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @GetMapping("/secure")
+    String webServiceTemplateSecured() throws Exception {
+        var doc = DocumentBuilderFactory.newInstance()
+                .newDocumentBuilder()
+                .newDocument();
+        var getMeElement = doc.createElementNS("http://example.com/ws", "getMeRequest");
+        var request = new DOMSource(getMeElement);
+        var response = new StringResult();
+        this.ws.sendSourceAndReceiveToResult(request, response);
+        IO.println("Response: " + response.toString());
+        return response .toString() ;
+//        return Objects.requireNonNull(response).getCountry();
     }
 
     @GetMapping("/ws")
