@@ -27,6 +27,7 @@ import org.springframework.security.oauth2.server.resource.authentication.Bearer
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationProvider;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.util.StringUtils;
 import org.springframework.ws.config.annotation.WsConfigurer;
 import org.springframework.ws.server.EndpointInterceptor;
 import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityInterceptor;
@@ -34,9 +35,9 @@ import org.w3c.dom.Element;
 
 import javax.xml.namespace.QName;
 import java.security.Principal;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import static com.example.ws.OAuthTokenProcessor.OAUTH_TOKEN_QNAME;
 import static org.apache.wss4j.dom.WSConstants.CUSTOM_TOKEN;
@@ -132,43 +133,26 @@ class OAuthTokenProcessor implements Processor {
 	@Override
 	public List<WSSecurityEngineResult> handleToken(Element elem, RequestData requestData) throws WSSecurityException {
 
-		// Sanity-check we’re on the right element
 		var qname = new QName(elem.getNamespaceURI(), elem.getLocalName());
 		if (!OAUTH_TOKEN_QNAME.equals(qname)) {
 			throw new WSSecurityException(WSSecurityException.ErrorCode.FAILURE, "invalidToken",
 					new Object[] { "Unexpected element for OAuth token" });
 		}
-
-		// Extract token text, trim whitespace
-		var token = elem.getTextContent();
-		if (token != null) {
-			token = token.trim();
-		}
-
-		// Build Credential and stash our Principal in it
-		var credential = new Credential();
+		var token = (StringUtils.hasText(elem.getTextContent()) ? elem.getTextContent() : "").trim();
 		var principal = new OAuthTokenPrincipal(token);
+		var credential = new Credential();
 		credential.setPrincipal(principal);
+		var validator = Objects.requireNonNull(requestData.getWssConfig().getValidator(OAUTH_TOKEN_QNAME));
+		validator.validate(credential, requestData);
 
-		// If a Validator is configured for our QName, call it
-		var validator = requestData.getWssConfig().getValidator(OAUTH_TOKEN_QNAME);
-		if (validator != null) {
-			credential = validator.validate(credential, requestData);
-		}
-		var results = new ArrayList<WSSecurityEngineResult>();
 		var result = new WSSecurityEngineResult(CUSTOM_TOKEN, List.of());
-		results.add(result);
-		if (requestData.getWsDocInfo() != null) {
-			requestData.getWsDocInfo().addResult(result);
-		}
-		return results;
+		Optional.ofNullable(requestData.getWsDocInfo()).ifPresent(doc -> doc.addResult(result));
+		return List.of(result);
 	}
 
 }
 
 class OAuthTokenValidator implements Validator {
-
-	private final Logger log = LoggerFactory.getLogger(getClass());
 
 	private final JwtAuthenticationProvider jwtAuthenticationProvider;
 
@@ -186,9 +170,6 @@ class OAuthTokenValidator implements Validator {
 				var upt = UsernamePasswordAuthenticationToken.authenticated(authentication.getName(), null,
 						AuthorityUtils.NO_AUTHORITIES);
 				SecurityContextHolder.getContext().setAuthentication(upt);
-				if (this.log.isDebugEnabled()) {
-					this.log.debug("authentication successful for: {}", upt.getName());
-				}
 				return credential;
 			}
 		}

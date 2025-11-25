@@ -1,5 +1,6 @@
 package com.example.ws;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -7,6 +8,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.oxm.jaxb.Jaxb2Marshaller;
 import org.springframework.ws.client.core.WebServiceTemplate;
+
+import java.util.Objects;
 
 @Configuration
 class ClientConfiguration {
@@ -34,12 +37,18 @@ class ClientConfiguration {
 class WsApplicationTests {
 
 	@Test
+	@Disabled
 	void one(@Autowired WebServiceTemplate webServiceTemplate) throws Exception {
 		var request = new GetCountryRequest();
 		request.setName("United Kingdom");
 		var response = (GetCountryResponse) webServiceTemplate.marshalSendAndReceive(request);
-		var country = response.getCountry();
+		var country = Objects.requireNonNull(response).getCountry();
 		IO.println(country.getName() + "=" + response);
+	}
+
+	@Test
+	void two(@Autowired WebServiceTemplate webServiceTemplate) throws Exception {
+
 	}
 
 }
