@@ -40,7 +40,7 @@ import java.util.Set;
  * this demonstrates how to do username and password based authentication with Spring
  * Security.
  */
-@Profile("two")
+//@Profile("two")
 @Configuration
 class Security2Configuration implements WsConfigurer {
 

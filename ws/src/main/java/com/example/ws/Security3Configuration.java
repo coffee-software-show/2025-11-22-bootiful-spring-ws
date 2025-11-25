@@ -15,6 +15,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -46,6 +47,7 @@ import static org.apache.wss4j.dom.WSConstants.CUSTOM_TOKEN;
  * this demonstrates how to do OAuth bearer token based authentication with Spring
  * Security.
  */
+@Profile("three")
 @Configuration
 class Security3Configuration implements WsConfigurer {
 
@@ -135,14 +137,16 @@ class OAuthTokenProcessor implements Processor {
 
 		var qname = new QName(elem.getNamespaceURI(), elem.getLocalName());
 		if (!OAUTH_TOKEN_QNAME.equals(qname)) {
-			throw new WSSecurityException(WSSecurityException.ErrorCode.FAILURE, "invalidToken",
-					new Object[] { "Unexpected element for OAuth token" });
+          throw new WSSecurityException(WSSecurityException.ErrorCode.FAILURE, "invalidToken",
+            new Object[] { "Unexpected element for OAuth token" });
 		}
-		var token = (StringUtils.hasText(elem.getTextContent()) ? elem.getTextContent() : "").trim();
+
+        var token = (StringUtils.hasText(elem.getTextContent()) ? elem.getTextContent() : "").trim();
 		var principal = new OAuthTokenPrincipal(token);
 		var credential = new Credential();
 		credential.setPrincipal(principal);
-		var validator = Objects.requireNonNull(requestData.getWssConfig().getValidator(OAUTH_TOKEN_QNAME));
+
+        var validator = Objects.requireNonNull(requestData.getWssConfig().getValidator(OAUTH_TOKEN_QNAME));
 		validator.validate(credential, requestData);
 
 		var result = new WSSecurityEngineResult(CUSTOM_TOKEN, List.of());
