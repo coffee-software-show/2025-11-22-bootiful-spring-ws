@@ -1,0 +1,38 @@
+logging:
+  level:
+    org.springframework.security: debug
+spring:
+#  datasource:
+#    password: secret
+#    username: myuser
+#    url: jdbc:postgresql://localhost/mydatabase
+  security:
+    oauth2:
+
+      authorizationserver:
+        client:
+
+          oidc-client:
+#            require-proof-key: false
+            registration:
+
+              client-id: "spring"
+              client-secret: "{noop}spring"
+              client-authentication-methods:
+                - "client_secret_basic"
+              authorization-grant-types:
+                - "authorization_code"
+                # - "client_credentials"
+                - "refresh_token"
+              redirect-uris:
+                - "http://127.0.0.1:8081/login/oauth2/code/spring"
+              scopes:
+                - "openid"
+                - "profile"
+
+
+  application:
+    name: auth
+server:
+  port: 9090
+
