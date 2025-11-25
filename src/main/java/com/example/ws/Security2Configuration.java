@@ -1,18 +1,12 @@
 package com.example.ws;
 
 import org.apache.wss4j.common.ext.WSSecurityException;
-import org.apache.wss4j.common.principal.SAMLTokenPrincipalImpl;
-import org.apache.wss4j.common.principal.WSUsernameTokenPrincipalImpl;
-import org.apache.wss4j.common.util.UsernameTokenUtil;
 import org.apache.wss4j.dom.WSConstants;
 import org.apache.wss4j.dom.engine.WSSConfig;
 import org.apache.wss4j.dom.engine.WSSecurityEngine;
-import org.apache.wss4j.dom.engine.WSSecurityEngineResult;
 import org.apache.wss4j.dom.handler.RequestData;
-import org.apache.wss4j.dom.message.token.UsernameToken;
 import org.apache.wss4j.dom.validate.Credential;
 import org.apache.wss4j.dom.validate.Validator;
-import org.apache.xml.security.utils.XMLUtils;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +32,6 @@ import org.springframework.ws.config.annotation.WsConfigurer;
 import org.springframework.ws.server.EndpointInterceptor;
 import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityInterceptor;
 import org.springframework.ws.soap.security.wss4j2.callback.SpringSecurityPasswordValidationCallbackHandler;
-import org.w3c.dom.Element;
 
 import java.util.List;
 import java.util.Set;
@@ -47,7 +40,7 @@ import java.util.Set;
  * this demonstrates how to do username and password based authentication with Spring
  * Security.
  */
-// @Profile("two")
+@Profile("two")
 @Configuration
 class Security2Configuration implements WsConfigurer {
 
@@ -83,7 +76,7 @@ class Security2Configuration implements WsConfigurer {
 
 	@Bean
 	SecurityFilterChain securityFilterChain(@Value("${spring.webservices.path:'/ws/**'}") String wsPath,
-			HttpSecurity http) throws Exception {
+			HttpSecurity http) {
 		return http //
 			.csrf(AbstractHttpConfigurer::disable) //
 			.authorizeHttpRequests(a -> a //
