@@ -18,9 +18,9 @@ import java.nio.charset.Charset;
 @SpringBootApplication
 public class ClientApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(ClientApplication.class, args);
-    }
+	public static void main(String[] args) {
+		SpringApplication.run(ClientApplication.class, args);
+	}
 
 }
 
@@ -28,33 +28,30 @@ public class ClientApplication {
 @ResponseBody
 class ClientController {
 
-    private final RestClient http;
-    private final String xml;
+	private final RestClient http;
 
-    ClientController(
-            @Value("classpath:/request.xml") Resource xml,
-            RestClient.Builder http) {
-        this.http = http.build();
-        try {
-            this.xml = xml.getContentAsString(Charset.defaultCharset());
-        } //
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
+	private final String xml;
 
+	ClientController(@Value("classpath:/request.xml") Resource xml, RestClient.Builder http) {
+		this.http = http.build();
+		try {
+			this.xml = xml.getContentAsString(Charset.defaultCharset());
+		} //
+		catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
 
-    @GetMapping("/")
-    String index(@RegisteredOAuth2AuthorizedClient OAuth2AuthorizedClient client) {
-        var token = client.getAccessToken().getTokenValue();
-        return this.http
-                .post()
-                .uri("http://localhost:8080/ws")
-                .contentType(MediaType.TEXT_XML)
-                .headers(h -> h.setBearerAuth(token))
-                .body(this.xml.replace("123", token))
-                .retrieve()
-                .body(String.class);
-    }
+	@GetMapping("/")
+	String index(@RegisteredOAuth2AuthorizedClient OAuth2AuthorizedClient client) {
+		var token = client.getAccessToken().getTokenValue();
+		return this.http.post()
+			.uri("http://localhost:8080/ws")
+			.contentType(MediaType.TEXT_XML)
+			.headers(h -> h.setBearerAuth(token))
+			.body(this.xml.replace("123", token))
+			.retrieve()
+			.body(String.class);
+	}
 
 }

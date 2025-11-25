@@ -42,7 +42,8 @@ import static com.example.ws.OAuthTokenProcessor.OAUTH_TOKEN_QNAME;
 import static org.apache.wss4j.dom.WSConstants.CUSTOM_TOKEN;
 
 /**
- * this demonstrates how to do OAuth bearer token based authentication with Spring Security.
+ * this demonstrates how to do OAuth bearer token based authentication with Spring
+ * Security.
  */
 @Configuration
 class Security3Configuration implements WsConfigurer {

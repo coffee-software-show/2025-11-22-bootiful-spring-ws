@@ -14,38 +14,33 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 @SpringBootApplication
 public class AuthApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(AuthApplication.class, args);
-    }
+	public static void main(String[] args) {
+		SpringApplication.run(AuthApplication.class, args);
+	}
 
-    @Bean
-    PasswordEncoder passwordEncoder() {
-        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
-    }
+	@Bean
+	PasswordEncoder passwordEncoder() {
+		return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+	}
 
-    @Bean
-    InMemoryUserDetailsManager inMemoryUserDetailsManager(PasswordEncoder pw) {
-        return new InMemoryUserDetailsManager(
-                User.withUsername("josh").password(pw.encode("pw")).roles("ADMIN", "USER").build(),
-                User.withUsername("rob").password(pw.encode("pw")).roles("USER").build(),
-                User.withUsername("james").password(pw.encode("pw")).roles("ADMIN", "USER").build()
-        );
-    }
+	@Bean
+	InMemoryUserDetailsManager inMemoryUserDetailsManager(PasswordEncoder pw) {
+		return new InMemoryUserDetailsManager(
+				User.withUsername("josh").password(pw.encode("pw")).roles("ADMIN", "USER").build(),
+				User.withUsername("rob").password(pw.encode("pw")).roles("USER").build(),
+				User.withUsername("james").password(pw.encode("pw")).roles("ADMIN", "USER").build());
+	}
 
-    //
-    @Bean
-    Customizer<HttpSecurity> httpSecurityCustomizer() {
-        return http -> http
-                .oauth2AuthorizationServer(a -> a.oidc(Customizer.withDefaults()))
-                .webAuthn(w -> w
-                        .allowedOrigins("http://localhost:8080")
-                        .rpName("bootiful")
-                        .rpId("localhost"))
-                .oneTimeTokenLogin(o -> o.tokenGenerationSuccessHandler((request, response, oneTimeToken) -> {
-                    response.getWriter().println("you've got console mail!");
-                    response.setContentType(MediaType.TEXT_PLAIN_VALUE);
-                    IO.println("please go to http://localhost:9090/login/ott?token=" +
-                            oneTimeToken.getTokenValue());
-                }));
-    }
+	//
+	@Bean
+	Customizer<HttpSecurity> httpSecurityCustomizer() {
+		return http -> http.oauth2AuthorizationServer(a -> a.oidc(Customizer.withDefaults()))
+			.webAuthn(w -> w.allowedOrigins("http://localhost:8080").rpName("bootiful").rpId("localhost"))
+			.oneTimeTokenLogin(o -> o.tokenGenerationSuccessHandler((request, response, oneTimeToken) -> {
+				response.getWriter().println("you've got console mail!");
+				response.setContentType(MediaType.TEXT_PLAIN_VALUE);
+				IO.println("please go to http://localhost:9090/login/ott?token=" + oneTimeToken.getTokenValue());
+			}));
+	}
+
 }
