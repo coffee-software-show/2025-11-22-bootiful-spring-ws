@@ -35,14 +35,15 @@ import java.util.Objects;
 @SpringBootApplication
 public class ClientApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(ClientApplication.class, args);
-    }
+	public static void main(String[] args) {
+		SpringApplication.run(ClientApplication.class, args);
+	}
 
-    @Bean
-    RestClient restClient(RestClient.Builder builder) {
-        return builder.build();
-    }
+	@Bean
+	RestClient restClient(RestClient.Builder builder) {
+		return builder.build();
+	}
+
 }
 
 /**
@@ -51,48 +52,42 @@ public class ClientApplication {
 @Configuration
 class Client2Configuration {
 
-    // let's NOT lock down the ws endpoint since it's just a username/pw in this case, not an OAuth client
-    @Bean
-    Customizer<HttpSecurity> httpSecurityCustomizer() {
-        return httpSecurity -> httpSecurity
-                .authorizeHttpRequests(a -> a
-                                .requestMatchers("/ws").permitAll()
-                                .requestMatchers("/secure").permitAll()
-                        // .anyRequest().authenticated()
-                );
-    }
+	// let's NOT lock down the ws endpoint since it's just a username/pw in this case, not
+	// an OAuth client
+	@Bean
+	Customizer<HttpSecurity> httpSecurityCustomizer() {
+		return httpSecurity -> httpSecurity
+			.authorizeHttpRequests(a -> a.requestMatchers("/ws").permitAll().requestMatchers("/secure").permitAll()
+			// .anyRequest().authenticated()
+			);
+	}
 
-    @Bean
-    Jaxb2Marshaller jaxb2Marshaller() {
-        var marshaller = new Jaxb2Marshaller();
-        marshaller.setPackagesToScan(GetCountryRequest.class.getPackageName());
-        return marshaller;
-    }
+	@Bean
+	Jaxb2Marshaller jaxb2Marshaller() {
+		var marshaller = new Jaxb2Marshaller();
+		marshaller.setPackagesToScan(GetCountryRequest.class.getPackageName());
+		return marshaller;
+	}
 
-    @Bean
-    Wss4jSecurityInterceptor wss4jSecurityInterceptor() {
-        var interceptor = new Wss4jSecurityInterceptor();
-        interceptor.setSecurementActions(WSHandlerConstants.USERNAME_TOKEN);
-        interceptor.setSecurementUsername("josh");
-        interceptor.setSecurementPassword("pw");
-        interceptor.setSecurementPasswordType(WSConstants.PW_TEXT);
-        return interceptor;
-    }
+	@Bean
+	Wss4jSecurityInterceptor wss4jSecurityInterceptor() {
+		var interceptor = new Wss4jSecurityInterceptor();
+		interceptor.setSecurementActions(WSHandlerConstants.USERNAME_TOKEN);
+		interceptor.setSecurementUsername("josh");
+		interceptor.setSecurementPassword("pw");
+		interceptor.setSecurementPasswordType(WSConstants.PW_TEXT);
+		return interceptor;
+	}
 
-    @Bean
-    WebServiceTemplate webServiceTemplate(
-            Jaxb2Marshaller jaxb2Marshaller,
-            WebServiceTemplateBuilder builder,
-            Wss4jSecurityInterceptor wss4jSecurityInterceptor
-    ) {
-        return builder
-                .interceptors(wss4jSecurityInterceptor)
-                .setDefaultUri("http://localhost:8080/ws")
-                .setMarshaller(jaxb2Marshaller)
-                .setUnmarshaller(jaxb2Marshaller)
-                .build();
-    }
-
+	@Bean
+	WebServiceTemplate webServiceTemplate(Jaxb2Marshaller jaxb2Marshaller, WebServiceTemplateBuilder builder,
+			Wss4jSecurityInterceptor wss4jSecurityInterceptor) {
+		return builder.interceptors(wss4jSecurityInterceptor)
+			.setDefaultUri("http://localhost:8080/ws")
+			.setMarshaller(jaxb2Marshaller)
+			.setUnmarshaller(jaxb2Marshaller)
+			.build();
+	}
 
 }
 
@@ -100,56 +95,52 @@ class Client2Configuration {
 @ResponseBody
 class ClientController {
 
-    private final RestClient rest;
-    private final WebServiceTemplate ws;
-    private final String xml;
+	private final RestClient rest;
 
-    ClientController(@Value("classpath:/request.xml") Resource xml,
-                     WebServiceTemplate template,
-                     RestClient rest) {
-        this.rest = rest;
-        this.ws = template;
-        try {
-            this.xml = xml.getContentAsString(Charset.defaultCharset());
-        } //
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
+	private final WebServiceTemplate ws;
 
-    @GetMapping("/secure")
-    String webServiceTemplateSecured() throws Exception {
-        var doc = DocumentBuilderFactory.newInstance()
-                .newDocumentBuilder()
-                .newDocument();
-        var getMeElement = doc.createElementNS("http://example.com/ws", "getMeRequest");
-        var request = new DOMSource(getMeElement);
-        var response = new StringResult();
-        this.ws.sendSourceAndReceiveToResult(request, response);
-        IO.println("Response: " + response.toString());
-        return response .toString() ;
-//        return Objects.requireNonNull(response).getCountry();
-    }
+	private final String xml;
 
-    @GetMapping("/ws")
-    Country webServiceTemplate() {
-        var getCountryRequest = new GetCountryRequest();
-        getCountryRequest.setName("United Kingdom");
-        var response = (GetCountryResponse) this.ws.marshalSendAndReceive(getCountryRequest);
-        return Objects.requireNonNull(response).getCountry();
-    }
+	ClientController(@Value("classpath:/request.xml") Resource xml, WebServiceTemplate template, RestClient rest) {
+		this.rest = rest;
+		this.ws = template;
+		try {
+			this.xml = xml.getContentAsString(Charset.defaultCharset());
+		} //
+		catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
 
-    @GetMapping("/rest")
-    String restClient(@RegisteredOAuth2AuthorizedClient OAuth2AuthorizedClient client) {
-        var token = client.getAccessToken().getTokenValue();
-        return this.rest //
-                .post() //
-                .uri("http://localhost:8080/ws") //
-                .contentType(MediaType.TEXT_XML)//
-                .headers(h -> h.setBearerAuth(token)) //
-                .body(this.xml.replace("123", token))//
-                .retrieve()//
-                .body(String.class);
-    }
+	@GetMapping("/secure")
+	String webServiceTemplateSecured() throws Exception {
+		var doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
+		var getMeElement = doc.createElementNS("http://example.com/ws", "getMeRequest");
+		var request = new DOMSource(getMeElement);
+		var response = new StringResult();
+		this.ws.sendSourceAndReceiveToResult(request, response);
+		return response.toString();
+	}
+
+	@GetMapping("/ws")
+	Country webServiceTemplate() {
+		var getCountryRequest = new GetCountryRequest();
+		getCountryRequest.setName("United Kingdom");
+		var response = (GetCountryResponse) this.ws.marshalSendAndReceive(getCountryRequest);
+		return Objects.requireNonNull(response).getCountry();
+	}
+
+	@GetMapping("/rest")
+	String restClient(@RegisteredOAuth2AuthorizedClient OAuth2AuthorizedClient client) {
+		var token = client.getAccessToken().getTokenValue();
+		return this.rest //
+			.post() //
+			.uri("http://localhost:8080/ws") //
+			.contentType(MediaType.TEXT_XML)//
+			.headers(h -> h.setBearerAuth(token)) //
+			.body(this.xml.replace("123", token))//
+			.retrieve()//
+			.body(String.class);
+	}
 
 }
