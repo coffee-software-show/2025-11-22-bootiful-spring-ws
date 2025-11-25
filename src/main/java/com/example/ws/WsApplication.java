@@ -16,76 +16,74 @@ import java.util.concurrent.ConcurrentHashMap;
 @SpringBootApplication
 public class WsApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(WsApplication.class, args);
-    }
+	public static void main(String[] args) {
+		SpringApplication.run(WsApplication.class, args);
+	}
 
 }
 
 @Endpoint
 class MeEndpoint {
 
+	private static final String NAMESPACE_URI = "http://example.com/ws";
 
-    private static final String NAMESPACE_URI = "http://example.com/ws";
-
-    @ResponsePayload
-    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "getMeRequest")
-    GetMeResponse getMe() {
-        var me = Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getName();
-        var meResponse = new GetMeResponse();
-        meResponse.setName(me);
-        return meResponse;
-    }
-
+	@ResponsePayload
+	@PayloadRoot(namespace = NAMESPACE_URI, localPart = "getMeRequest")
+	GetMeResponse getMe() {
+		var me = Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getName();
+		var meResponse = new GetMeResponse();
+		meResponse.setName(me);
+		return meResponse;
+	}
 
 }
 
 @Endpoint
 class CountryEndpoint {
 
-    private static final String NAMESPACE_URI = "http://example.com/ws";
+	private static final String NAMESPACE_URI = "http://example.com/ws";
 
-    private final CountryRepository countryRepository;
+	private final CountryRepository countryRepository;
 
-    CountryEndpoint(CountryRepository countryRepository) {
-        this.countryRepository = countryRepository;
-    }
+	CountryEndpoint(CountryRepository countryRepository) {
+		this.countryRepository = countryRepository;
+	}
 
-    @ResponsePayload
-    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "getCountryRequest")
-    GetCountryResponse getCountry(@RequestPayload GetCountryRequest request) {
-        var response = new GetCountryResponse();
-        response.setCountry(this.countryRepository.findCountry(request.getName()));
-        return response;
-    }
+	@ResponsePayload
+	@PayloadRoot(namespace = NAMESPACE_URI, localPart = "getCountryRequest")
+	GetCountryResponse getCountry(@RequestPayload GetCountryRequest request) {
+		var response = new GetCountryResponse();
+		response.setCountry(this.countryRepository.findCountry(request.getName()));
+		return response;
+	}
 
 }
 
 @Repository
 class CountryRepository {
 
-    private final Map<String, Country> countries = new ConcurrentHashMap<>();
+	private final Map<String, Country> countries = new ConcurrentHashMap<>();
 
-    CountryRepository() {
-        this.add("Spain", "Madrid", Currency.EUR, 46704314);
-        this.add("Poland", "Warsaw", Currency.PLN, 38186860);
-        this.add("United Kingdom", "London", Currency.GBP, 63705000);
-        IO.println(this.countries);
-    }
+	CountryRepository() {
+		this.add("Spain", "Madrid", Currency.EUR, 46704314);
+		this.add("Poland", "Warsaw", Currency.PLN, 38186860);
+		this.add("United Kingdom", "London", Currency.GBP, 63705000);
+		IO.println(this.countries);
+	}
 
-    private void add(String name, String capital, Currency currency, int population) {
-        this.countries.computeIfAbsent(name, s -> {
-            var country = new Country();
-            country.setCurrency(currency);
-            country.setName(name);
-            country.setCapital(capital);
-            country.setPopulation(population);
-            return country;
-        });
-    }
+	private void add(String name, String capital, Currency currency, int population) {
+		this.countries.computeIfAbsent(name, s -> {
+			var country = new Country();
+			country.setCurrency(currency);
+			country.setName(name);
+			country.setCapital(capital);
+			country.setPopulation(population);
+			return country;
+		});
+	}
 
-    public Country findCountry(String name) {
-        return this.countries.get(name);
-    }
+	public Country findCountry(String name) {
+		return this.countries.get(name);
+	}
 
 }
