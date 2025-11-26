@@ -2,17 +2,19 @@ package com.example.ws.aot;
 
 import jakarta.xml.bind.annotation.*;
 import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+import org.apache.wss4j.dom.engine.WSSConfig;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.LoggerFactory;
 import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.TypeReference;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContribution;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
-import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackages;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.context.ApplicationContext;
@@ -33,6 +35,17 @@ import java.util.Set;
 @AutoConfiguration
 @ImportRuntimeHints({ SpringWsHints.class })
 class SpringWsConfiguration {
+
+	@Configuration
+	@ConditionalOnClass(WSSConfig.class)
+	@ImportRuntimeHints(Wss4jHints.class)
+	static class Wss4jConfiguration {
+
+		Wss4jConfiguration() {
+			LoggerFactory.getLogger(getClass()).info("Wss4j AOT configuration " + "have been initialized");
+		}
+
+	}
 
 	@Bean
 	static JaxbBeanFactoryInitializationAotProcessor jaxbBeanFactoryInitializationAotProcessor() {

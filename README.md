@@ -1,5 +1,6 @@
 # README
 
+## act 1: the basics 
 * introducing Spring WS
 * introduce the `service.xsd`
 * nb: there's a namespace for the XML document, in this case `http://example.com/ws`. the resulting code will be generated into `com.example.ws`. 
@@ -124,8 +125,14 @@ class ClientController {
 * add `ws-support` to see the support for other protocols.  [JMS](https://docs.spring.io/spring-ws/docs/current/reference/html/#_jms_transport) and [e-mail](https://docs.spring.io/spring-ws/docs/current/reference/html/#_email_transport) and [XMPP](https://docs.spring.io/spring-ws/docs/current/reference/html/#_xmpp_transport). 
 * it works really well if you're using it in a (synchronous) Tomcat-based Servlet context, obviously, and especially so in a Spring Boot context. Spring Boot ships with an autoconfiguration that stands up an embedded webserver and installs the requisite `MessageDispatcherServlet`. 
 * funny enough, Spring WS - which is a _very_ old project with code that's almost 20 years old - ships with an embedded webserver implementation. Obviously, you won't want to use this since Spring Boot does the job so much better. I just think its interesting. 
-* anyway, since Spring WS assumes a Servlet container, you'll want to enable virtual threads: `spring.threads.virtual.enabled=true`, on both the client and the service.
-* 
+* anyway, since Spring WS assumes a Servlet container and runtime, as opposed to a reactive runtime like Netty, you'll want to enable virtual threads: `spring.threads.virtual.enabled=true`, on both the client and the service.
+
+
+## act 2: GraalVM native images 
+* so far we've been running the service embedded in the Spring Boot application. obviously, today there are many ways to dramatically improve the runtime efficiency of JVM-based code. One of my favorites is to use GraalVM to pre-compile a JVm program into native code. 
+* I wondered how difficult it might be to do that for a Spring WS application. It's not _too_ bad, though I'll tell you it wasn't trivial, either.
+
+
 
 
 
