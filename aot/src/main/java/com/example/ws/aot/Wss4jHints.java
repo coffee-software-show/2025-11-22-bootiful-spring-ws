@@ -4,6 +4,7 @@ import org.apache.wss4j.dom.engine.WSSConfig;
 import org.apache.wss4j.dom.transform.AttachmentCiphertextTransform;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.LoggerFactory;
 import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
@@ -20,6 +21,7 @@ class Wss4jHints implements RuntimeHintsRegistrar {
 
 	@Override
 	public void registerHints(@NonNull RuntimeHints hints, @Nullable ClassLoader classLoader) {
+		LoggerFactory.getLogger(Wss4jHints.class).info("Registering WSS4J Hint for ");
 		this.registerWssConfigClasses(hints);
 	}
 

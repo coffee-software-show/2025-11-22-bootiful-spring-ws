@@ -41,10 +41,6 @@ class SpringWsConfiguration {
 	@ImportRuntimeHints(Wss4jHints.class)
 	static class Wss4jConfiguration {
 
-		Wss4jConfiguration() {
-			LoggerFactory.getLogger(getClass()).info("Wss4j AOT configuration " + "have been initialized");
-		}
-
 	}
 
 	@Bean
