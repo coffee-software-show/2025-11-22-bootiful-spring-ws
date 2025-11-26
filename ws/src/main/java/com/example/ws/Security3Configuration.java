@@ -3,13 +3,11 @@ package com.example.ws;
 import org.apache.wss4j.common.ext.WSSecurityException;
 import org.apache.wss4j.dom.WSConstants;
 import org.apache.wss4j.dom.engine.WSSConfig;
-import org.apache.wss4j.dom.engine.WSSecurityEngine;
 import org.apache.wss4j.dom.engine.WSSecurityEngineResult;
 import org.apache.wss4j.dom.handler.RequestData;
 import org.apache.wss4j.dom.validate.Credential;
 import org.apache.wss4j.dom.validate.Validator;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -28,7 +26,6 @@ import org.springframework.security.oauth2.server.resource.authentication.Bearer
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationProvider;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.util.CollectionUtils;
 import org.springframework.ws.config.annotation.WsConfigurer;
 import org.springframework.ws.server.EndpointInterceptor;
 import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityInterceptor;
@@ -82,6 +79,18 @@ class Security3Configuration implements WsConfigurer {
 			.build();
 	}
 
+	@Bean
+	WSSConfig wssConfig(OauthTokenBinaryTokenValidator oauthTokenBinaryTokenValidator) {
+		var wssconfig = WSSConfig.getNewInstance();
+		wssconfig.setValidator(WSConstants.BINARY_TOKEN, oauthTokenBinaryTokenValidator);
+		return wssconfig;
+	}
+
+	@Bean
+	OauthTokenBinaryTokenValidator oauthTokenBinaryTokenValidator(JwtAuthenticationProvider authenticationProvider) {
+		return new OauthTokenBinaryTokenValidator(authenticationProvider);
+	}
+
 	static class OauthTokenBinaryTokenValidator implements Validator {
 
 		private final Logger log = LoggerFactory.getLogger(getClass());
@@ -112,39 +121,17 @@ class Security3Configuration implements WsConfigurer {
 	}
 
 	@Bean
-	OauthTokenBinaryTokenValidator oauthTokenBinaryTokenValidator(JwtAuthenticationProvider authenticationProvider) {
-		return new OauthTokenBinaryTokenValidator(authenticationProvider);
-	}
-
-	@Bean
-	WSSConfig wssConfig(OauthTokenBinaryTokenValidator oauthTokenBinaryTokenValidator) {
-		var wssconfig = WSSConfig.getNewInstance();
-		wssconfig.setValidator(WSConstants.BINARY_TOKEN, oauthTokenBinaryTokenValidator);
-		return wssconfig;
-	}
-
-	@Bean
-	WSSecurityEngine wsSecurityEngine(WSSConfig wssConfig) {
-		var wsse = new WSSecurityEngine();
-		wsse.setWssConfig(wssConfig);
-		return wsse;
-	}
-
-	@Bean
-	JwtWss4jSecurityInterceptor wss4jSecurityInterceptor(WSSecurityEngine wsSecurityEngine) {
-		var ws4jsi = new JwtWss4jSecurityInterceptor(wsSecurityEngine);
+	JwtWss4jSecurityInterceptor wss4jSecurityInterceptor(WSSConfig wssConfig) {
+		var ws4jsi = new JwtWss4jSecurityInterceptor();
+		ws4jsi.setWssConfig(wssConfig);
 		ws4jsi.setValidationActions("Timestamp");
 		return ws4jsi;
 	}
 
-	// override so that we can tell WSS4J to not freak out if we don't have a
-	// corresponding action
 	static class JwtWss4jSecurityInterceptor extends Wss4jSecurityInterceptor {
 
-		JwtWss4jSecurityInterceptor(WSSecurityEngine securityEngine) {
-			super(securityEngine);
-		}
-
+		// override so that we can tell WSS4J to not freak out if we don't have a
+		// corresponding action
 		@Override
 		protected void checkResults(@NonNull List<WSSecurityEngineResult> results,
 				@NonNull List<Integer> validationActions) throws Wss4jSecurityValidationException {
