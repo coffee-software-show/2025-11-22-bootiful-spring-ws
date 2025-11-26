@@ -1,14 +1,17 @@
 package com.example.ws;
 
 import org.apache.wss4j.common.ext.WSSecurityException;
+import org.apache.wss4j.dom.WSConstants;
 import org.apache.wss4j.dom.engine.WSSConfig;
 import org.apache.wss4j.dom.engine.WSSecurityEngine;
 import org.apache.wss4j.dom.engine.WSSecurityEngineResult;
 import org.apache.wss4j.dom.handler.RequestData;
-import org.apache.wss4j.dom.processor.Processor;
 import org.apache.wss4j.dom.validate.Credential;
 import org.apache.wss4j.dom.validate.Validator;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -25,26 +28,16 @@ import org.springframework.security.oauth2.server.resource.authentication.Bearer
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationProvider;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.util.StringUtils;
+import org.springframework.util.CollectionUtils;
 import org.springframework.ws.config.annotation.WsConfigurer;
 import org.springframework.ws.server.EndpointInterceptor;
 import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityInterceptor;
-import org.w3c.dom.Element;
+import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityValidationException;
 
-import javax.xml.namespace.QName;
-import java.security.Principal;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 
-import static com.example.ws.Security3Configuration.OAuthTokenProcessor.OAUTH_TOKEN_QNAME;
-import static org.apache.wss4j.dom.WSConstants.CUSTOM_TOKEN;
-
-/**
- * this demonstrates how to do OAuth bearer token based authentication with Spring
- * Security.
- */
-// @Profile("three")
 @Configuration
 class Security3Configuration implements WsConfigurer {
 
@@ -89,11 +82,44 @@ class Security3Configuration implements WsConfigurer {
 			.build();
 	}
 
+	static class OauthTokenBinaryTokenValidator implements Validator {
+
+		private final Logger log = LoggerFactory.getLogger(getClass());
+
+		private final JwtAuthenticationProvider jwtAuthenticationProvider;
+
+		OauthTokenBinaryTokenValidator(JwtAuthenticationProvider authenticationProvider) {
+			this.jwtAuthenticationProvider = authenticationProvider;
+		}
+
+		@Override
+		public Credential validate(Credential credential, RequestData data) throws WSSecurityException {
+			var binarySecurityToken = credential.getBinarySecurityToken();
+			if (binarySecurityToken == null)
+				throw new WSSecurityException(WSSecurityException.ErrorCode.FAILURE);
+			var jwt = new String(binarySecurityToken.getToken(), StandardCharsets.UTF_8);
+			this.log.info("the JWT is {}", jwt);
+			var authentication = this.jwtAuthenticationProvider.authenticate(new BearerTokenAuthenticationToken(jwt));
+			if (Objects.requireNonNull(authentication).isAuthenticated()) {
+				var upt = UsernamePasswordAuthenticationToken.authenticated(authentication.getName(), null,
+						AuthorityUtils.NO_AUTHORITIES);
+				SecurityContextHolder.getContext().setAuthentication(upt);
+				return credential;
+			}
+			throw new WSSecurityException(WSSecurityException.ErrorCode.FAILED_AUTHENTICATION);
+		}
+
+	}
+
 	@Bean
-	WSSConfig wssConfig(OAuthTokenProcessor processor, OAuthTokenValidator validator) {
+	OauthTokenBinaryTokenValidator oauthTokenBinaryTokenValidator(JwtAuthenticationProvider authenticationProvider) {
+		return new OauthTokenBinaryTokenValidator(authenticationProvider);
+	}
+
+	@Bean
+	WSSConfig wssConfig(OauthTokenBinaryTokenValidator oauthTokenBinaryTokenValidator) {
 		var wssconfig = WSSConfig.getNewInstance();
-		wssconfig.setProcessor(OAUTH_TOKEN_QNAME, processor);
-		wssconfig.setValidator(OAUTH_TOKEN_QNAME, validator);
+		wssconfig.setValidator(WSConstants.BINARY_TOKEN, oauthTokenBinaryTokenValidator);
 		return wssconfig;
 	}
 
@@ -105,84 +131,23 @@ class Security3Configuration implements WsConfigurer {
 	}
 
 	@Bean
-	Wss4jSecurityInterceptor wss4jSecurityInterceptor(WSSecurityEngine wsSecurityEngine) {
-		var ws4jsi = new Wss4jSecurityInterceptor(wsSecurityEngine);
-		ws4jsi.setValidationActions("CustomToken");
+	JwtWss4jSecurityInterceptor wss4jSecurityInterceptor(WSSecurityEngine wsSecurityEngine) {
+		var ws4jsi = new JwtWss4jSecurityInterceptor(wsSecurityEngine);
+		ws4jsi.setValidationActions("Timestamp");
 		return ws4jsi;
 	}
 
-	@Bean
-	OAuthTokenProcessor oAuthTokenProcessor() {
-		return new OAuthTokenProcessor();
-	}
+	// override so that we can tell WSS4J to not freak out if we don't have a
+	// corresponding action
+	static class JwtWss4jSecurityInterceptor extends Wss4jSecurityInterceptor {
 
-	@Bean
-	OAuthTokenValidator oAuthTokenValidator(JwtAuthenticationProvider jwtAuthenticationProvider) {
-		return new OAuthTokenValidator(jwtAuthenticationProvider);
-	}
-
-	static class OAuthTokenValidator implements Validator {
-
-		private final JwtAuthenticationProvider jwtAuthenticationProvider;
-
-		OAuthTokenValidator(JwtAuthenticationProvider jwtAuthenticationProvider) {
-			this.jwtAuthenticationProvider = jwtAuthenticationProvider;
+		JwtWss4jSecurityInterceptor(WSSecurityEngine securityEngine) {
+			super(securityEngine);
 		}
 
 		@Override
-		public Credential validate(Credential credential, RequestData data) throws WSSecurityException {
-
-			if (credential.getPrincipal() != null
-					&& credential.getPrincipal() instanceof OAuthTokenPrincipal(String token)) {
-				var authentication = this.jwtAuthenticationProvider
-					.authenticate(new BearerTokenAuthenticationToken(token));
-				if (Objects.requireNonNull(authentication).isAuthenticated()) {
-					var upt = UsernamePasswordAuthenticationToken.authenticated(authentication.getName(), null,
-							AuthorityUtils.NO_AUTHORITIES);
-					SecurityContextHolder.getContext().setAuthentication(upt);
-					return credential;
-				}
-			}
-			throw new WSSecurityException(WSSecurityException.ErrorCode.FAILURE, "invalidToken",
-					new Object[] { "missing or invalid OAuthTokenPrincipal" });
-		}
-
-	}
-
-	static record OAuthTokenPrincipal(String token) implements Principal {
-
-		@Override
-		public String getName() {
-			return token;
-		}
-
-	}
-
-	static class OAuthTokenProcessor implements Processor {
-
-		public static final String OAUTH_NS = "http://joshlong.com/soap/security/oauth";
-
-		public static final QName OAUTH_TOKEN_QNAME = new QName(OAUTH_NS, "BearerToken");
-
-		@Override
-		public List<WSSecurityEngineResult> handleToken(Element elem, RequestData requestData)
-				throws WSSecurityException {
-			var qname = new QName(elem.getNamespaceURI(), elem.getLocalName());
-			if (!OAUTH_TOKEN_QNAME.equals(qname)) {
-				throw new WSSecurityException(WSSecurityException.ErrorCode.FAILURE, "invalidToken",
-						new Object[] { "Unexpected element for OAuth token" });
-			}
-			var token = (StringUtils.hasText(elem.getTextContent()) ? elem.getTextContent() : "").trim();
-			var principal = new OAuthTokenPrincipal(token);
-			var credential = new Credential();
-			credential.setPrincipal(principal);
-
-			var validator = Objects.requireNonNull(requestData.getWssConfig().getValidator(OAUTH_TOKEN_QNAME));
-			validator.validate(credential, requestData);
-
-			var result = new WSSecurityEngineResult(CUSTOM_TOKEN, List.of());
-			Optional.ofNullable(requestData.getWsDocInfo()).ifPresent(doc -> doc.addResult(result));
-			return List.of(result);
+		protected void checkResults(@NonNull List<WSSecurityEngineResult> results,
+				@NonNull List<Integer> validationActions) throws Wss4jSecurityValidationException {
 		}
 
 	}
