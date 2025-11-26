@@ -36,6 +36,9 @@ class ClientConfiguration {
 @SpringBootTest(classes = ClientConfiguration.class)
 class WsApplicationTests {
 
+	// todo figure out how to do OAuth in a WebServiceTemplate situation,
+	// then use it from the client app. atm, it's just me submitting requests using
+	// RestClient..
 	@Test
 	@Disabled
 	void one(@Autowired WebServiceTemplate webServiceTemplate) throws Exception {
@@ -44,11 +47,6 @@ class WsApplicationTests {
 		var response = (GetCountryResponse) webServiceTemplate.marshalSendAndReceive(request);
 		var country = Objects.requireNonNull(response).getCountry();
 		IO.println(country.getName() + "=" + response);
-	}
-
-	@Test
-	void two(@Autowired WebServiceTemplate webServiceTemplate) throws Exception {
-
 	}
 
 }

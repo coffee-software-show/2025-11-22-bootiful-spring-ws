@@ -9,8 +9,6 @@ import org.apache.wss4j.dom.processor.Processor;
 import org.apache.wss4j.dom.validate.Credential;
 import org.apache.wss4j.dom.validate.Validator;
 import org.jspecify.annotations.NonNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -39,13 +37,14 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-import static com.example.ws.OAuthTokenProcessor.OAUTH_TOKEN_QNAME;
+import static com.example.ws.Security3Configuration.OAuthTokenProcessor.OAUTH_TOKEN_QNAME;
 import static org.apache.wss4j.dom.WSConstants.CUSTOM_TOKEN;
 
 /**
  * this demonstrates how to do OAuth bearer token based authentication with Spring
  * Security.
  */
+// @Profile("three")
 @Configuration
 class Security3Configuration implements WsConfigurer {
 
@@ -122,68 +121,70 @@ class Security3Configuration implements WsConfigurer {
 		return new OAuthTokenValidator(jwtAuthenticationProvider);
 	}
 
-}
+	static class OAuthTokenValidator implements Validator {
 
-class OAuthTokenProcessor implements Processor {
+		private final JwtAuthenticationProvider jwtAuthenticationProvider;
 
-	public static final String OAUTH_NS = "http://joshlong.com/soap/security/oauth";
-
-	public static final QName OAUTH_TOKEN_QNAME = new QName(OAUTH_NS, "BearerToken");
-
-	@Override
-	public List<WSSecurityEngineResult> handleToken(Element elem, RequestData requestData) throws WSSecurityException {
-
-		var qname = new QName(elem.getNamespaceURI(), elem.getLocalName());
-		if (!OAUTH_TOKEN_QNAME.equals(qname)) {
-			throw new WSSecurityException(WSSecurityException.ErrorCode.FAILURE, "invalidToken",
-					new Object[] { "Unexpected element for OAuth token" });
+		OAuthTokenValidator(JwtAuthenticationProvider jwtAuthenticationProvider) {
+			this.jwtAuthenticationProvider = jwtAuthenticationProvider;
 		}
-		var token = (StringUtils.hasText(elem.getTextContent()) ? elem.getTextContent() : "").trim();
-		var principal = new OAuthTokenPrincipal(token);
-		var credential = new Credential();
-		credential.setPrincipal(principal);
-		var validator = Objects.requireNonNull(requestData.getWssConfig().getValidator(OAUTH_TOKEN_QNAME));
-		validator.validate(credential, requestData);
 
-		var result = new WSSecurityEngineResult(CUSTOM_TOKEN, List.of());
-		Optional.ofNullable(requestData.getWsDocInfo()).ifPresent(doc -> doc.addResult(result));
-		return List.of(result);
-	}
+		@Override
+		public Credential validate(Credential credential, RequestData data) throws WSSecurityException {
 
-}
-
-class OAuthTokenValidator implements Validator {
-
-	private final JwtAuthenticationProvider jwtAuthenticationProvider;
-
-	OAuthTokenValidator(JwtAuthenticationProvider jwtAuthenticationProvider) {
-		this.jwtAuthenticationProvider = jwtAuthenticationProvider;
-	}
-
-	@Override
-	public Credential validate(Credential credential, RequestData data) throws WSSecurityException {
-
-		if (credential.getPrincipal() != null
-				&& credential.getPrincipal() instanceof OAuthTokenPrincipal(String token)) {
-			var authentication = this.jwtAuthenticationProvider.authenticate(new BearerTokenAuthenticationToken(token));
-			if (Objects.requireNonNull(authentication).isAuthenticated()) {
-				var upt = UsernamePasswordAuthenticationToken.authenticated(authentication.getName(), null,
-						AuthorityUtils.NO_AUTHORITIES);
-				SecurityContextHolder.getContext().setAuthentication(upt);
-				return credential;
+			if (credential.getPrincipal() != null
+					&& credential.getPrincipal() instanceof OAuthTokenPrincipal(String token)) {
+				var authentication = this.jwtAuthenticationProvider
+					.authenticate(new BearerTokenAuthenticationToken(token));
+				if (Objects.requireNonNull(authentication).isAuthenticated()) {
+					var upt = UsernamePasswordAuthenticationToken.authenticated(authentication.getName(), null,
+							AuthorityUtils.NO_AUTHORITIES);
+					SecurityContextHolder.getContext().setAuthentication(upt);
+					return credential;
+				}
 			}
+			throw new WSSecurityException(WSSecurityException.ErrorCode.FAILURE, "invalidToken",
+					new Object[] { "missing or invalid OAuthTokenPrincipal" });
 		}
-		throw new WSSecurityException(WSSecurityException.ErrorCode.FAILURE, "invalidToken",
-				new Object[] { "missing or invalid OAuthTokenPrincipal" });
+
 	}
 
-}
+	static record OAuthTokenPrincipal(String token) implements Principal {
 
-record OAuthTokenPrincipal(String token) implements Principal {
+		@Override
+		public String getName() {
+			return token;
+		}
 
-	@Override
-	public String getName() {
-		return token;
+	}
+
+	static class OAuthTokenProcessor implements Processor {
+
+		public static final String OAUTH_NS = "http://joshlong.com/soap/security/oauth";
+
+		public static final QName OAUTH_TOKEN_QNAME = new QName(OAUTH_NS, "BearerToken");
+
+		@Override
+		public List<WSSecurityEngineResult> handleToken(Element elem, RequestData requestData)
+				throws WSSecurityException {
+			var qname = new QName(elem.getNamespaceURI(), elem.getLocalName());
+			if (!OAUTH_TOKEN_QNAME.equals(qname)) {
+				throw new WSSecurityException(WSSecurityException.ErrorCode.FAILURE, "invalidToken",
+						new Object[] { "Unexpected element for OAuth token" });
+			}
+			var token = (StringUtils.hasText(elem.getTextContent()) ? elem.getTextContent() : "").trim();
+			var principal = new OAuthTokenPrincipal(token);
+			var credential = new Credential();
+			credential.setPrincipal(principal);
+
+			var validator = Objects.requireNonNull(requestData.getWssConfig().getValidator(OAUTH_TOKEN_QNAME));
+			validator.validate(credential, requestData);
+
+			var result = new WSSecurityEngineResult(CUSTOM_TOKEN, List.of());
+			Optional.ofNullable(requestData.getWsDocInfo()).ifPresent(doc -> doc.addResult(result));
+			return List.of(result);
+		}
+
 	}
 
 }

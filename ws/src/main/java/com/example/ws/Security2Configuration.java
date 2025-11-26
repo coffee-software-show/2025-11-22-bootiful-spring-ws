@@ -132,8 +132,6 @@ class Security2Configuration implements WsConfigurer {
 				var usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(name, pw);
 				var authenticated = this.daoAuthenticationProvider.authenticate(usernamePasswordAuthenticationToken);
 				if (authenticated.isAuthenticated()) {
-					if (this.log.isDebugEnabled())
-						this.log.debug("the user {} has been authenticated", name);
 					SecurityContextHolder.getContext().setAuthentication(authenticated);
 					return credential;
 				}
