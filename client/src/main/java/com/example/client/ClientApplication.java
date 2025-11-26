@@ -111,16 +111,35 @@ class Client2Configuration {
 
 }
 
+// @Profile("three")
 @Configuration
 class Client3Configuration {
 
 	@Bean
-	JwtBinarySecurityTokenClientInterceptor oAuthBearerSecurityInterceptor(
-			OAuth2AuthorizedClientManager authorizedClientManager) {
-		return new JwtBinarySecurityTokenClientInterceptor(authorizedClientManager);
+	Jaxb2Marshaller jaxb2Marshaller() {
+		var marshaller = new Jaxb2Marshaller();
+		marshaller.setPackagesToScan(GetCountryRequest.class.getPackageName());
+		return marshaller;
 	}
 
-	static class JwtBinarySecurityTokenClientInterceptor implements ClientInterceptor {
+	@Bean
+	WebServiceTemplate webServiceTemplate(OauthTokenBinaryTokenClientInterceptor oAuthBearerSecurityInterceptor,
+			Jaxb2Marshaller jaxb2Marshaller, WebServiceTemplateBuilder builder) {
+		return builder //
+			.interceptors(oAuthBearerSecurityInterceptor) //
+			.setDefaultUri("http://localhost:8080/ws") //
+			.setMarshaller(jaxb2Marshaller) //
+			.setUnmarshaller(jaxb2Marshaller)
+			.build();
+	}
+
+	@Bean
+	OauthTokenBinaryTokenClientInterceptor oAuthBearerSecurityInterceptor(
+			OAuth2AuthorizedClientManager authorizedClientManager) {
+		return new OauthTokenBinaryTokenClientInterceptor(authorizedClientManager);
+	}
+
+	static class OauthTokenBinaryTokenClientInterceptor implements ClientInterceptor {
 
 		private static final String WSSE_NS = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd";
 
@@ -135,7 +154,7 @@ class Client3Configuration {
 
 		private final OAuth2AuthorizedClientManager authorizedClientManager;
 
-		JwtBinarySecurityTokenClientInterceptor(OAuth2AuthorizedClientManager authorizedClientManager) {
+		OauthTokenBinaryTokenClientInterceptor(OAuth2AuthorizedClientManager authorizedClientManager) {
 			this.authorizedClientManager = authorizedClientManager;
 		}
 
@@ -210,23 +229,6 @@ class Client3Configuration {
 		public void afterCompletion(MessageContext messageContext, Exception ex) {
 		}
 
-	}
-
-	@Bean
-	Jaxb2Marshaller jaxb2Marshaller() {
-		var marshaller = new Jaxb2Marshaller();
-		marshaller.setPackagesToScan(GetCountryRequest.class.getPackageName());
-		return marshaller;
-	}
-
-	@Bean
-	WebServiceTemplate webServiceTemplate(JwtBinarySecurityTokenClientInterceptor oAuthBearerSecurityInterceptor,
-			Jaxb2Marshaller jaxb2Marshaller, WebServiceTemplateBuilder builder) {
-		return builder.interceptors(oAuthBearerSecurityInterceptor)
-			.setDefaultUri("http://localhost:8080/ws")
-			.setMarshaller(jaxb2Marshaller)
-			.setUnmarshaller(jaxb2Marshaller)
-			.build();
 	}
 
 }
