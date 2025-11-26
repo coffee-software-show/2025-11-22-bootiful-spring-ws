@@ -2,6 +2,9 @@
 
 ## act 1: the basics 
 * introducing Spring WS
+* what is SOAP? (simple object access protocol? simple? really?)
+* it's not REST, that's for dang sure. (see the swamp of POX!) 
+* that said, tons of folks still use it and maintain systems that use it,  and they'll be pleased to know you can still eke out some good performance and scalability and security, as we'll show in this video.
 * introduce the `service.xsd`
 * nb: there's a namespace for the XML document, in this case `http://example.com/ws`. the resulting code will be generated into `com.example.ws`. 
 * set up the JAXB model in a separate project.
@@ -26,7 +29,7 @@
     </configuration>
 </plugin>
 ```
-* move `service.xsd` to src/main/resources in the `aot` folder.
+* move `service.xsd` to src/main/resources in the `model` folder.
 * install it to maven local m2.
 * build our first service, an `@Endpoint`, called `CountryEndpoint`.
 * hit the Spring Initializr: add Java 25, webmvc, security, graalvm, and - most importantly  - "Spring WebServices" (NB: Spring WS doesn't search particularly well!)
@@ -64,6 +67,7 @@ class CountryEndpoint {
     }
 }
 ```
+* Spring WS is a framework for building SOAP-based services. SOAP assumes XML. Spring has a lot of rich support for XML processing, obviously. In Spring Framework itself, there's a very interesting module called Spring OXM that contains marshallers and unmarshallers for marshalling objects to and from XML. This package was contributed, not surprisingly, by  Arjne Poutsma, the creator and first lead of the Spring WS project. 
 * we can try this out two ways, from the CLI, and using Spring's `WebServicesTemplate`. Let's try it out from the CLI.
 * add the following XMl to a document called `request-1.xml`:
 ```xml
@@ -130,9 +134,29 @@ class ClientController {
 
 ## act 2: GraalVM native images 
 * so far we've been running the service embedded in the Spring Boot application. obviously, today there are many ways to dramatically improve the runtime efficiency of JVM-based code. One of my favorites is to use GraalVM to pre-compile a JVm program into native code. 
-* I wondered how difficult it might be to do that for a Spring WS application. It's not _too_ bad, though I'll tell you it wasn't trivial, either.
+* I wondered how difficult it might be to do that for a Spring WS application. It's not _too_ bad, though I'll tell you it wasn't trivial, either. anyway, ive packaged up all the work in my little aggregation project, [here](https://github.com/bootiful-spring-graalvm/hints). this project is not an official project and is in no way maintained or supported. but, for this application in this moment, it works. it's apache 2 licensed so you can always go here and just grab the bits yourself.
 
+## act 3: basic username/password security
 
+* spring WS is a framework for building SOAP services. it runs on the web, but does not assume the web. so its not practical to assume that HTTP layer transports apply to SOAP. 
+* Instead, the convention is that there be in the XML request payload itself extra elements (unhelpfully called _headers_) that stipulate out of band information (like credentials) for a given SOAP envelope. 
+* what goes in those headers for security is specified by a separate specification called WS-Security.
+* it is a message-level security specification.
+* WS-security covers a _ton_ of possible scenarios:
+  * username / password tokens 
+  * X.509 certificates
+  * SAML tokens 
+  * Kerberos tickets
+  * custom tokens (text and binary)
+  * digital signatures (with XML-DSIg), allowing you to sign parts or all of the SOAP envelope
+  * encryption (uses XML encryption), allowing you to encrypt parts or all of the SOAP body.
+* WS-Security in turn can be used with a _slew_ of other specifications, some of which never went GA, including WS-Policy, WS-Trust, WS-Federation, WS-SecureConversation, etc. 
+* sounds like a confusing rat's nest? it is and we shan't get too much further into it.
+* WS-Security started with the best of intentions. before WS-Security, SOAP used transport-level security like HTTPS and HTTP Basic. 
+* but this meant that messages were either entirely signed, or not, entirely enccrypted, or not. 
+* it also meant that there was no way to ensure multi-hop routing securely. 
+* in 2002, IBM, Microsoft, and VeriSign submitted a spec to OASIS and that became the foundation of WS-Security, and indeed when we first got the notion of WS-* (whose name is now a curse)
+* 
 
 
 
