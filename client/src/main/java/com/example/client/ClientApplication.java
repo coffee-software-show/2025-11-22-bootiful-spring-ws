@@ -51,14 +51,14 @@ import java.util.Objects;
 @SpringBootApplication
 public class ClientApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(ClientApplication.class, args);
-    }
+	public static void main(String[] args) {
+		SpringApplication.run(ClientApplication.class, args);
+	}
 
-    @Bean
-    RestClient restClient(RestClient.Builder builder) {
-        return builder.build();
-    }
+	@Bean
+	RestClient restClient(RestClient.Builder builder) {
+		return builder.build();
+	}
 
 }
 
@@ -69,228 +69,216 @@ public class ClientApplication {
 @Configuration
 class Client2Configuration {
 
-    // let's NOT lock down the ws endpoint since it's just a username/pw in this case, not
-    // an OAuth client
-    @Bean
-    Customizer<HttpSecurity> httpSecurityCustomizer() {
-        return httpSecurity -> httpSecurity
-                .authorizeHttpRequests(a -> a
-                        .requestMatchers("/ws").permitAll() //
-                        .requestMatchers("/username").permitAll() //
-                );
-    }
+	// let's NOT lock down the ws endpoint since it's just a username/pw in this case, not
+	// an OAuth client
+	@Bean
+	Customizer<HttpSecurity> httpSecurityCustomizer() {
+		return httpSecurity -> httpSecurity.authorizeHttpRequests(a -> a.requestMatchers("/ws")
+			.permitAll() //
+			.requestMatchers("/username")
+			.permitAll() //
+		);
+	}
 
-    @Bean
-    Jaxb2Marshaller jaxb2Marshaller() {
-        var marshaller = new Jaxb2Marshaller();
-        marshaller.setPackagesToScan(GetCountryRequest.class.getPackageName());
-        return marshaller;
-    }
+	@Bean
+	Jaxb2Marshaller jaxb2Marshaller() {
+		var marshaller = new Jaxb2Marshaller();
+		marshaller.setPackagesToScan(GetCountryRequest.class.getPackageName());
+		return marshaller;
+	}
 
-    @Bean
-    Wss4jSecurityInterceptor wss4jSecurityInterceptor() {
-        var interceptor = new Wss4jSecurityInterceptor();
-        interceptor.setSecurementActions(WSHandlerConstants.USERNAME_TOKEN);
-        interceptor.setSecurementUsername("josh");
-        interceptor.setSecurementPassword("pw");
-        interceptor.setSecurementPasswordType(WSConstants.PW_TEXT);
-        return interceptor;
-    }
+	@Bean
+	Wss4jSecurityInterceptor wss4jSecurityInterceptor() {
+		var interceptor = new Wss4jSecurityInterceptor();
+		interceptor.setSecurementActions(WSHandlerConstants.USERNAME_TOKEN);
+		interceptor.setSecurementUsername("josh");
+		interceptor.setSecurementPassword("pw");
+		interceptor.setSecurementPasswordType(WSConstants.PW_TEXT);
+		return interceptor;
+	}
 
-    @Bean
-    WebServiceTemplate webServiceTemplate(Jaxb2Marshaller jaxb2Marshaller, WebServiceTemplateBuilder builder,
-                                          Wss4jSecurityInterceptor wss4jSecurityInterceptor) {
-        return builder.interceptors(wss4jSecurityInterceptor)
-                .setDefaultUri("http://localhost:8080/ws")
-                .setMarshaller(jaxb2Marshaller)
-                .setUnmarshaller(jaxb2Marshaller)
-                .build();
-    }
+	@Bean
+	WebServiceTemplate webServiceTemplate(Jaxb2Marshaller jaxb2Marshaller, WebServiceTemplateBuilder builder,
+			Wss4jSecurityInterceptor wss4jSecurityInterceptor) {
+		return builder.interceptors(wss4jSecurityInterceptor)
+			.setDefaultUri("http://localhost:8080/ws")
+			.setMarshaller(jaxb2Marshaller)
+			.setUnmarshaller(jaxb2Marshaller)
+			.build();
+	}
 
 }
 
 /**
- * In this scenario, we want to act as OAuth client.
- * All requests must originate with a valid OAuth token which we can then install
- * in the request made to the downstream SOAP service.
+ * In this scenario, we want to act as OAuth client. All requests must originate with a
+ * valid OAuth token which we can then install in the request made to the downstream SOAP
+ * service.
  *
  */
 @Configuration
 class Client3Configuration {
 
+	@Bean
+	OAuthBearerSecurityInterceptor oAuthBearerSecurityInterceptor(
+			OAuth2AuthorizedClientManager authorizedClientManager) {
+		return new OAuthBearerSecurityInterceptor(authorizedClientManager);
+	}
 
-    @Bean
-    OAuthBearerSecurityInterceptor oAuthBearerSecurityInterceptor(OAuth2AuthorizedClientManager authorizedClientManager) {
-        return new OAuthBearerSecurityInterceptor(authorizedClientManager);
-    }
+	/**
+	 * injects a custom security header to convey the OAuth token on each request.
+	 */
+	static class OAuthBearerSecurityInterceptor extends TransformerObjectSupport implements ClientInterceptor {
 
-    /**
-     * injects a custom security header to convey the OAuth token on each request.
-     */
-    static class OAuthBearerSecurityInterceptor extends TransformerObjectSupport
-            implements ClientInterceptor {
+		private static final String WSSE_NS = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd";
 
-        private static final String WSSE_NS =
-                "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd";
-        private static final String OAUTH_NS =
-                "http://joshlong.com/soap/security/oauth";
+		private static final String OAUTH_NS = "http://joshlong.com/soap/security/oauth";
 
-        private final SecurityContextHolderStrategy securityContextHolderStrategy = SecurityContextHolder
-                .getContextHolderStrategy();
+		private final SecurityContextHolderStrategy securityContextHolderStrategy = SecurityContextHolder
+			.getContextHolderStrategy();
 
-        private final OAuth2AuthorizedClientManager authorizedClientManager;
+		private final OAuth2AuthorizedClientManager authorizedClientManager;
 
-        OAuthBearerSecurityInterceptor(OAuth2AuthorizedClientManager authorizedClientManager) {
-            this.authorizedClientManager = authorizedClientManager;
-        }
+		OAuthBearerSecurityInterceptor(OAuth2AuthorizedClientManager authorizedClientManager) {
+			this.authorizedClientManager = authorizedClientManager;
+		}
 
-        @Override
-        public boolean handleRequest(@NonNull MessageContext messageContext) throws WebServiceClientException {
+		@Override
+		public boolean handleRequest(@NonNull MessageContext messageContext) throws WebServiceClientException {
 
+			var soapMessage = (SoapMessage) messageContext.getRequest();
+			var soapHeader = soapMessage.getSoapHeader();
+			var securityNs = new QName(WSSE_NS, "Security", "wsse");
+			var soapHeaderElement = Objects.requireNonNull(soapHeader).addHeaderElement(securityNs);
+			soapHeaderElement.setMustUnderstand(true);
+			var bearerFragment = """
+					<oauth:BearerToken xmlns:oauth="%s">%s</oauth:BearerToken>
+					""".formatted(OAUTH_NS, this.token());
 
-            var soapMessage = (SoapMessage) messageContext.getRequest();
-            var soapHeader = soapMessage.getSoapHeader();
-            var securityNs = new QName(WSSE_NS, "Security", "wsse");
-            var soapHeaderElement = Objects.requireNonNull(soapHeader).addHeaderElement(securityNs);
-            soapHeaderElement.setMustUnderstand(true);
-            var bearerFragment = """
-                    <oauth:BearerToken xmlns:oauth="%s">%s</oauth:BearerToken>
-                    """.formatted(OAUTH_NS, this.token());
+			try {
+				var transformer = this.createTransformer();
+				transformer.transform(new StringSource(bearerFragment), soapHeaderElement.getResult());
+				return true;
+			} //
+			catch (Exception e) {
+				throw new RuntimeException(e);
+			}
 
+		}
 
-            try {
-                var transformer = this.createTransformer();
-                transformer.transform(new StringSource(bearerFragment), soapHeaderElement.getResult());
-                return true;
-            } //
-            catch (Exception e) {
-                throw new RuntimeException(e);
-            }
+		private String token() {
+			var principal = this.securityContextHolderStrategy.getContext().getAuthentication();
+			if (principal instanceof OAuth2AuthenticationToken auth2AuthenticationToken) {
+				var clientRegistrationId = auth2AuthenticationToken.getAuthorizedClientRegistrationId();
+				var oAuth2AuthorizedClient = this.oAuth2AuthorizedClient(clientRegistrationId,
+						auth2AuthenticationToken);
+				return oAuth2AuthorizedClient.getAccessToken().getTokenValue();
+			}
+			throw new IllegalStateException("couldn't resolve the registered client id and an associated token!");
+		}
 
+		private OAuth2AuthorizedClient oAuth2AuthorizedClient(String clientRegistrationId, Authentication principal) {
+			var authorizeRequest = OAuth2AuthorizeRequest.withClientRegistrationId(clientRegistrationId)
+				.principal(principal)
+				.build();
+			return this.authorizedClientManager.authorize(authorizeRequest);
+		}
 
-        }
+		@Override
+		public boolean handleResponse(@NonNull MessageContext messageContext) throws WebServiceClientException {
+			return true;
+		}
 
-        private String token() {
-            var principal = this.securityContextHolderStrategy.getContext().getAuthentication();
-            if (principal instanceof OAuth2AuthenticationToken auth2AuthenticationToken) {
-                var clientRegistrationId = auth2AuthenticationToken.getAuthorizedClientRegistrationId();
-                var oAuth2AuthorizedClient = this.oAuth2AuthorizedClient(clientRegistrationId, auth2AuthenticationToken);
-                return oAuth2AuthorizedClient.getAccessToken().getTokenValue();
-            }
-            throw new IllegalStateException("couldn't resolve the registered client id and an associated token!");
-        }
+		@Override
+		public boolean handleFault(@NonNull MessageContext messageContext) throws WebServiceClientException {
+			return true;
+		}
 
-        private OAuth2AuthorizedClient oAuth2AuthorizedClient(String clientRegistrationId,
-                                                              Authentication principal) {
-            var authorizeRequest = OAuth2AuthorizeRequest
-                    .withClientRegistrationId(clientRegistrationId)
-                    .principal(principal)
-                    .build();
-            return this.authorizedClientManager.authorize(authorizeRequest);
-        }
+		@Override
+		public void afterCompletion(@NonNull MessageContext messageContext, @Nullable Exception ex)
+				throws WebServiceClientException {
+		}
 
-        @Override
-        public boolean handleResponse(@NonNull MessageContext messageContext) throws WebServiceClientException {
-            return true;
-        }
+	}
 
-        @Override
-        public boolean handleFault(@NonNull MessageContext messageContext) throws WebServiceClientException {
-            return true;
-        }
+	@Bean
+	Jaxb2Marshaller jaxb2Marshaller() {
+		var marshaller = new Jaxb2Marshaller();
+		marshaller.setPackagesToScan(GetCountryRequest.class.getPackageName());
+		return marshaller;
+	}
 
-        @Override
-        public void afterCompletion(@NonNull MessageContext messageContext, @Nullable Exception ex) throws WebServiceClientException {
-        }
-    }
-
-    @Bean
-    Jaxb2Marshaller jaxb2Marshaller() {
-        var marshaller = new Jaxb2Marshaller();
-        marshaller.setPackagesToScan(GetCountryRequest.class.getPackageName());
-        return marshaller;
-    }
-
-
-    @Bean
-    WebServiceTemplate webServiceTemplate(
-            OAuthBearerSecurityInterceptor oAuthBearerSecurityInterceptor,
-            Jaxb2Marshaller jaxb2Marshaller,
-            WebServiceTemplateBuilder builder
-    ) {
-        return builder
-                .interceptors(
-                        oAuthBearerSecurityInterceptor)
-                .setDefaultUri("http://localhost:8080/ws")
-                .setMarshaller(jaxb2Marshaller)
-                .setUnmarshaller(jaxb2Marshaller)
-                .build();
-    }
+	@Bean
+	WebServiceTemplate webServiceTemplate(OAuthBearerSecurityInterceptor oAuthBearerSecurityInterceptor,
+			Jaxb2Marshaller jaxb2Marshaller, WebServiceTemplateBuilder builder) {
+		return builder.interceptors(oAuthBearerSecurityInterceptor)
+			.setDefaultUri("http://localhost:8080/ws")
+			.setMarshaller(jaxb2Marshaller)
+			.setUnmarshaller(jaxb2Marshaller)
+			.build();
+	}
 
 }
-
 
 @Controller
 @ResponseBody
 class ClientController {
 
-    private final RestClient rest;
+	private final RestClient rest;
 
-    private final WebServiceTemplate ws;
+	private final WebServiceTemplate ws;
 
-    private final String xml;
+	private final String xml;
 
-    ClientController(@Value("classpath:/request.xml") Resource xml, WebServiceTemplate template, RestClient rest) {
-        this.rest = rest;
-        this.ws = template;
-        try {
-            this.xml = xml.getContentAsString(Charset.defaultCharset());
-        } //
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
+	ClientController(@Value("classpath:/request.xml") Resource xml, WebServiceTemplate template, RestClient rest) {
+		this.rest = rest;
+		this.ws = template;
+		try {
+			this.xml = xml.getContentAsString(Charset.defaultCharset());
+		} //
+		catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
 
-    @GetMapping("/oauth")
-    String oauthSecuredWebServiceTemplate()
-            throws Exception {
-        var doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
-        var getMeElement = doc.createElementNS("http://example.com/ws", "getMeRequest");
-        var request = new DOMSource(getMeElement);
-        var response = new StringResult();
-        this.ws.sendSourceAndReceiveToResult(request, response);
-        return response.toString();
-    }
+	@GetMapping("/oauth")
+	String oauthSecuredWebServiceTemplate() throws Exception {
+		var doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
+		var getMeElement = doc.createElementNS("http://example.com/ws", "getMeRequest");
+		var request = new DOMSource(getMeElement);
+		var response = new StringResult();
+		this.ws.sendSourceAndReceiveToResult(request, response);
+		return response.toString();
+	}
 
-    @GetMapping("/username")
-    String usernamePassworedSecuredWebServiceTemplate() throws Exception {
-        var doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
-        var getMeElement = doc.createElementNS("http://example.com/ws", "getMeRequest");
-        var request = new DOMSource(getMeElement);
-        var response = new StringResult();
-        this.ws.sendSourceAndReceiveToResult(request, response);
-        return response.toString();
-    }
+	@GetMapping("/username")
+	String usernamePassworedSecuredWebServiceTemplate() throws Exception {
+		var doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
+		var getMeElement = doc.createElementNS("http://example.com/ws", "getMeRequest");
+		var request = new DOMSource(getMeElement);
+		var response = new StringResult();
+		this.ws.sendSourceAndReceiveToResult(request, response);
+		return response.toString();
+	}
 
-    @GetMapping("/ws")
-    Country webServiceTemplate() {
-        var getCountryRequest = new GetCountryRequest();
-        getCountryRequest.setName("United Kingdom");
-        var response = (GetCountryResponse) this.ws.marshalSendAndReceive(getCountryRequest);
-        return Objects.requireNonNull(response).getCountry();
-    }
+	@GetMapping("/ws")
+	Country webServiceTemplate() {
+		var getCountryRequest = new GetCountryRequest();
+		getCountryRequest.setName("United Kingdom");
+		var response = (GetCountryResponse) this.ws.marshalSendAndReceive(getCountryRequest);
+		return Objects.requireNonNull(response).getCountry();
+	}
 
-    @GetMapping("/rest")
-    String restClient(@RegisteredOAuth2AuthorizedClient OAuth2AuthorizedClient client) {
-        var token = client.getAccessToken().getTokenValue();
-        return this.rest //
-                .post() //
-                .uri("http://localhost:8080/ws") //
-                .contentType(MediaType.TEXT_XML)//
-                .headers(h -> h.setBearerAuth(token)) //
-                .body(this.xml.replace("123", token))//
-                .retrieve()//
-                .body(String.class);
-    }
+	@GetMapping("/rest")
+	String restClient(@RegisteredOAuth2AuthorizedClient OAuth2AuthorizedClient client) {
+		var token = client.getAccessToken().getTokenValue();
+		return this.rest //
+			.post() //
+			.uri("http://localhost:8080/ws") //
+			.contentType(MediaType.TEXT_XML)//
+			.headers(h -> h.setBearerAuth(token)) //
+			.body(this.xml.replace("123", token))//
+			.retrieve()//
+			.body(String.class);
+	}
 
 }

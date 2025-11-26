@@ -44,129 +44,129 @@ import java.util.Set;
 @Configuration
 class Security2Configuration implements WsConfigurer {
 
-    private final ObjectProvider<@NonNull Wss4jSecurityInterceptor> securityInterceptors;
+	private final ObjectProvider<@NonNull Wss4jSecurityInterceptor> securityInterceptors;
 
-    Security2Configuration(ObjectProvider<@NonNull Wss4jSecurityInterceptor> securityInterceptors) {
-        this.securityInterceptors = securityInterceptors;
-    }
+	Security2Configuration(ObjectProvider<@NonNull Wss4jSecurityInterceptor> securityInterceptors) {
+		this.securityInterceptors = securityInterceptors;
+	}
 
-    @Override
-    public void addInterceptors(List<EndpointInterceptor> interceptors) {
-        interceptors.add(securityInterceptors.getIfAvailable());
-    }
+	@Override
+	public void addInterceptors(List<EndpointInterceptor> interceptors) {
+		interceptors.add(securityInterceptors.getIfAvailable());
+	}
 
-    @Bean
-    PasswordEncoder passwordEncoder() {
-        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
-    }
+	@Bean
+	PasswordEncoder passwordEncoder() {
+		return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+	}
 
-    @Bean
-    InMemoryUserDetailsManager inMemoryUserDetailsManager(PasswordEncoder passwordEncoder) {
-        var users = Set.of("stephane", "rob", "josh")
-                .stream()
-                .map(username -> User //
-                        .withUsername(username)//
-                        .password(passwordEncoder.encode("pw"))
-                        .roles("USER") //
-                        .build() //
-                )
-                .toList();
-        return new InMemoryUserDetailsManager(users);
-    }
+	@Bean
+	InMemoryUserDetailsManager inMemoryUserDetailsManager(PasswordEncoder passwordEncoder) {
+		var users = Set.of("stephane", "rob", "josh")
+			.stream()
+			.map(username -> User //
+				.withUsername(username)//
+				.password(passwordEncoder.encode("pw"))
+				.roles("USER") //
+				.build() //
+			)
+			.toList();
+		return new InMemoryUserDetailsManager(users);
+	}
 
-    @Bean
-    SecurityFilterChain securityFilterChain(@Value("${spring.webservices.path:'/ws/**'}") String wsPath,
-                                            HttpSecurity http) {
-        return http //
-                .csrf(AbstractHttpConfigurer::disable) //
-                .authorizeHttpRequests(a -> a //
-                        .requestMatchers(wsPath.endsWith("/**") ? wsPath : wsPath + "/**") //
-                        .permitAll()
-                        .anyRequest()
-                        .authenticated() //
-                )
-                .httpBasic(Customizer.withDefaults())
-                .build();
-    }
+	@Bean
+	SecurityFilterChain securityFilterChain(@Value("${spring.webservices.path:'/ws/**'}") String wsPath,
+			HttpSecurity http) {
+		return http //
+			.csrf(AbstractHttpConfigurer::disable) //
+			.authorizeHttpRequests(a -> a //
+				.requestMatchers(wsPath.endsWith("/**") ? wsPath : wsPath + "/**") //
+				.permitAll()
+				.anyRequest()
+				.authenticated() //
+			)
+			.httpBasic(Customizer.withDefaults())
+			.build();
+	}
 
-    @Bean
-    SpringSecurityPasswordValidationCallbackHandler springSecurityPasswordValidationCallbackHandler(
-            UserDetailsService service) {
-        var security = new SpringSecurityPasswordValidationCallbackHandler();
-        security.setUserDetailsService(service);
-        return security;
-    }
+	@Bean
+	SpringSecurityPasswordValidationCallbackHandler springSecurityPasswordValidationCallbackHandler(
+			UserDetailsService service) {
+		var security = new SpringSecurityPasswordValidationCallbackHandler();
+		security.setUserDetailsService(service);
+		return security;
+	}
 
-    @Bean
-    UserDetailsServiceUsernameTokenValidator userDetailsServiceUsernameTokenValidator(PasswordEncoder passwordEncoder,
-                                                                                      UserDetailsService userDetailsService) {
-        return new UserDetailsServiceUsernameTokenValidator(passwordEncoder, userDetailsService);
-    }
+	@Bean
+	UserDetailsServiceUsernameTokenValidator userDetailsServiceUsernameTokenValidator(PasswordEncoder passwordEncoder,
+			UserDetailsService userDetailsService) {
+		return new UserDetailsServiceUsernameTokenValidator(passwordEncoder, userDetailsService);
+	}
 
-    /**
-     * @author Josh Long
-     */
-    static class UserDetailsServiceUsernameTokenValidator implements Validator {
+	/**
+	 * @author Josh Long
+	 */
+	static class UserDetailsServiceUsernameTokenValidator implements Validator {
 
-        private final Logger log = LoggerFactory.getLogger(getClass());
+		private final Logger log = LoggerFactory.getLogger(getClass());
 
-        private final DaoAuthenticationProvider daoAuthenticationProvider;
+		private final DaoAuthenticationProvider daoAuthenticationProvider;
 
-        UserDetailsServiceUsernameTokenValidator(DaoAuthenticationProvider authenticationProvider) {
-            this.daoAuthenticationProvider = authenticationProvider;
-        }
+		UserDetailsServiceUsernameTokenValidator(DaoAuthenticationProvider authenticationProvider) {
+			this.daoAuthenticationProvider = authenticationProvider;
+		}
 
-        UserDetailsServiceUsernameTokenValidator(PasswordEncoder passwordEncoder,
-                                                 UserDetailsService userDetailsService) {
-            this.daoAuthenticationProvider = new DaoAuthenticationProvider(userDetailsService);
-            this.daoAuthenticationProvider.setPasswordEncoder(passwordEncoder);
-            this.daoAuthenticationProvider.afterPropertiesSet();
-        }
+		UserDetailsServiceUsernameTokenValidator(PasswordEncoder passwordEncoder,
+				UserDetailsService userDetailsService) {
+			this.daoAuthenticationProvider = new DaoAuthenticationProvider(userDetailsService);
+			this.daoAuthenticationProvider.setPasswordEncoder(passwordEncoder);
+			this.daoAuthenticationProvider.afterPropertiesSet();
+		}
 
-        @Override
-        public Credential validate(Credential credential, RequestData data) throws WSSecurityException {
-            try {
-                var credentialUsernametoken = credential.getUsernametoken();
-                var pw = credentialUsernametoken.getPassword();
-                var name = credentialUsernametoken.getName();
-                var usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(name, pw);
-                var authenticated = this.daoAuthenticationProvider.authenticate(usernamePasswordAuthenticationToken);
-                if (authenticated.isAuthenticated()) {
-                    SecurityContextHolder.getContext().setAuthentication(authenticated);
-                    return credential;
-                }
-            } //
-            catch (UsernameNotFoundException e) {
-                // we'll fall through to the exception thrown below.
-                this.log.warn("couldn't authenticate! {} ", e.getMessage());
-            }
+		@Override
+		public Credential validate(Credential credential, RequestData data) throws WSSecurityException {
+			try {
+				var credentialUsernametoken = credential.getUsernametoken();
+				var pw = credentialUsernametoken.getPassword();
+				var name = credentialUsernametoken.getName();
+				var usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(name, pw);
+				var authenticated = this.daoAuthenticationProvider.authenticate(usernamePasswordAuthenticationToken);
+				if (authenticated.isAuthenticated()) {
+					SecurityContextHolder.getContext().setAuthentication(authenticated);
+					return credential;
+				}
+			} //
+			catch (UsernameNotFoundException e) {
+				// we'll fall through to the exception thrown below.
+				this.log.warn("couldn't authenticate! {} ", e.getMessage());
+			}
 
-            throw new WSSecurityException(WSSecurityException.ErrorCode.FAILED_AUTHENTICATION);
-        }
+			throw new WSSecurityException(WSSecurityException.ErrorCode.FAILED_AUTHENTICATION);
+		}
 
-    }
+	}
 
-    @Bean
-    WSSConfig wssConfig(UserDetailsServiceUsernameTokenValidator userDetailsServiceUsernameTokenValidator) {
-        var wssconfig = WSSConfig.getNewInstance();
-        wssconfig.setValidator(WSConstants.USERNAME_TOKEN, userDetailsServiceUsernameTokenValidator);
-        return wssconfig;
-    }
+	@Bean
+	WSSConfig wssConfig(UserDetailsServiceUsernameTokenValidator userDetailsServiceUsernameTokenValidator) {
+		var wssconfig = WSSConfig.getNewInstance();
+		wssconfig.setValidator(WSConstants.USERNAME_TOKEN, userDetailsServiceUsernameTokenValidator);
+		return wssconfig;
+	}
 
-    @Bean
-    WSSecurityEngine wsSecurityEngine(WSSConfig wssConfig) {
-        var wsse = new WSSecurityEngine();
-        wsse.setWssConfig(wssConfig);
-        return wsse;
-    }
+	@Bean
+	WSSecurityEngine wsSecurityEngine(WSSConfig wssConfig) {
+		var wsse = new WSSecurityEngine();
+		wsse.setWssConfig(wssConfig);
+		return wsse;
+	}
 
-    @Bean
-    Wss4jSecurityInterceptor wss4jSecurityInterceptor(WSSecurityEngine wsSecurityEngine,
-                                                      SpringSecurityPasswordValidationCallbackHandler handler) {
-        var ws4jsi = new Wss4jSecurityInterceptor(wsSecurityEngine);
-        ws4jsi.setValidationActions("UsernameToken");
-        ws4jsi.setValidationCallbackHandler(handler);
-        return ws4jsi;
-    }
+	@Bean
+	Wss4jSecurityInterceptor wss4jSecurityInterceptor(WSSecurityEngine wsSecurityEngine,
+			SpringSecurityPasswordValidationCallbackHandler handler) {
+		var ws4jsi = new Wss4jSecurityInterceptor(wsSecurityEngine);
+		ws4jsi.setValidationActions("UsernameToken");
+		ws4jsi.setValidationCallbackHandler(handler);
+		return ws4jsi;
+	}
 
 }
