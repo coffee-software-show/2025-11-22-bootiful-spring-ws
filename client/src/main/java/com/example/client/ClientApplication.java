@@ -103,10 +103,11 @@ class Client2Configuration {
 	@Bean
 	WebServiceTemplate webServiceTemplate(Jaxb2Marshaller jaxb2Marshaller, WebServiceTemplateBuilder builder,
 			Wss4jSecurityInterceptor wss4jSecurityInterceptor) {
-		return builder.interceptors(wss4jSecurityInterceptor)
-			.setDefaultUri("http://localhost:8080/ws")
-			.setMarshaller(jaxb2Marshaller)
-			.setUnmarshaller(jaxb2Marshaller)
+		return builder //
+			.interceptors(wss4jSecurityInterceptor) //
+			.setDefaultUri("http://localhost:8080/ws") //
+			.setMarshaller(jaxb2Marshaller)//
+			.setUnmarshaller(jaxb2Marshaller)//
 			.build();
 	}
 
