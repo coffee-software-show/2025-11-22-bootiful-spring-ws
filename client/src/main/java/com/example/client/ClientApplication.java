@@ -7,13 +7,16 @@ import org.apache.wss4j.dom.WSConstants;
 import org.apache.wss4j.dom.handler.WSHandlerConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.aot.hint.RuntimeHints;
+import org.springframework.aot.hint.RuntimeHintsRegistrar;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.webservices.client.WebServiceTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ImportRuntimeHints;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 import org.springframework.oxm.jaxb.Jaxb2Marshaller;
@@ -221,7 +224,19 @@ class Client3Configuration {
 
 @Controller
 @ResponseBody
+@ImportRuntimeHints(ClientController.Hints.class)
 class ClientController {
+
+	static class Hints implements RuntimeHintsRegistrar {
+
+		@Override
+		public void registerHints(RuntimeHints hints, @Nullable ClassLoader classLoader) {
+			hints.resources().registerResource(REQUEST_RESOURCE);
+		}
+
+	}
+
+	static final Resource REQUEST_RESOURCE = new ClassPathResource("/request.xml");
 
 	private final RestClient rest;
 
@@ -229,11 +244,11 @@ class ClientController {
 
 	private final String xml;
 
-	ClientController(@Value("classpath:/request.xml") Resource xml, WebServiceTemplate template, RestClient rest) {
+	ClientController(WebServiceTemplate template, RestClient rest) {
 		this.rest = rest;
 		this.ws = template;
 		try {
-			this.xml = xml.getContentAsString(Charset.defaultCharset());
+			this.xml = REQUEST_RESOURCE.getContentAsString(Charset.defaultCharset());
 		} //
 		catch (IOException e) {
 			throw new RuntimeException(e);
