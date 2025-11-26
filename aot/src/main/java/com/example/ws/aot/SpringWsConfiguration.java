@@ -10,6 +10,8 @@ import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContribution;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackages;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
@@ -28,7 +30,7 @@ import java.util.Set;
 /**
  * @author Josh Long
  */
-@Configuration
+@AutoConfiguration
 @ImportRuntimeHints({ SpringWsHints.class })
 class SpringWsConfiguration {
 

@@ -35,12 +35,11 @@
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
 
-        <!--
-          this contains the stuff for other exchanges, like JMS or email.
-          <dependency>
-              <groupId>org.springframework.ws</groupId>
-              <artifactId>spring-ws-support</artifactId>
-          </dependency>-->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>aot</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
 
 
         <dependency>
