@@ -28,7 +28,6 @@ import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.stereotype.Controller;
-import org.springframework.util.Assert;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.client.RestClient;
@@ -40,10 +39,10 @@ import org.springframework.ws.soap.SoapMessage;
 import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityInterceptor;
 import org.springframework.xml.transform.StringResult;
 import org.springframework.xml.transform.StringSource;
+import org.springframework.xml.transform.TransformerObjectSupport;
 
 import javax.xml.namespace.QName;
 import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -128,7 +127,8 @@ class Client3Configuration {
     /**
      * injects a custom security header to convey the OAuth token on each request.
      */
-    static class OAuthBearerSecurityInterceptor implements ClientInterceptor {
+    static class OAuthBearerSecurityInterceptor extends TransformerObjectSupport
+            implements ClientInterceptor {
 
         private static final String WSSE_NS =
                 "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd";
@@ -146,36 +146,38 @@ class Client3Configuration {
 
         @Override
         public boolean handleRequest(@NonNull MessageContext messageContext) throws WebServiceClientException {
+
+
+            var soapMessage = (SoapMessage) messageContext.getRequest();
+            var soapHeader = soapMessage.getSoapHeader();
+            var securityNs = new QName(WSSE_NS, "Security", "wsse");
+            var soapHeaderElement = Objects.requireNonNull(soapHeader).addHeaderElement(securityNs);
+            soapHeaderElement.setMustUnderstand(true);
+            var bearerFragment = """
+                    <oauth:BearerToken xmlns:oauth="%s">%s</oauth:BearerToken>
+                    """.formatted(OAUTH_NS, this.token());
+
+
+            try {
+                var transformer = this.createTransformer();
+                transformer.transform(new StringSource(bearerFragment), soapHeaderElement.getResult());
+                return true;
+            } //
+            catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
+
+        }
+
+        private String token() {
             var principal = this.securityContextHolderStrategy.getContext().getAuthentication();
             if (principal instanceof OAuth2AuthenticationToken auth2AuthenticationToken) {
                 var clientRegistrationId = auth2AuthenticationToken.getAuthorizedClientRegistrationId();
-                Assert.hasText(clientRegistrationId, "unable to resolve the registered client id!");
                 var oAuth2AuthorizedClient = this.oAuth2AuthorizedClient(clientRegistrationId, auth2AuthenticationToken);
-                Assert.notNull(oAuth2AuthorizedClient, "unable to resolve the registered client");
-                var soapMessage = (SoapMessage) messageContext.getRequest();
-                var soapHeader = soapMessage.getSoapHeader();
-                var securityNs = new QName(WSSE_NS, "Security", "wsse");
-                var soapHeaderElement = soapHeader.addHeaderElement(securityNs);
-                soapHeaderElement.setMustUnderstand(true);
-                var bearerFragment = """
-                        <oauth:BearerToken xmlns:oauth="%s">%s</oauth:BearerToken>
-                        """.formatted(OAUTH_NS, oAuth2AuthorizedClient.getAccessToken().getTokenValue());
-
-                IO.println("<oauth:BearerToken>" + bearerFragment);
-
-                try {
-                    var transformer = TransformerFactory
-                            .newInstance()
-                            .newTransformer();
-                    transformer.transform(new StringSource(bearerFragment), soapHeaderElement.getResult());
-                    return true;
-                } //
-                catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-
+                return oAuth2AuthorizedClient.getAccessToken().getTokenValue();
             }
-            return false;
+            throw new IllegalStateException("couldn't resolve the registered client id and an associated token!");
         }
 
         private OAuth2AuthorizedClient oAuth2AuthorizedClient(String clientRegistrationId,
@@ -200,8 +202,6 @@ class Client3Configuration {
         @Override
         public void afterCompletion(@NonNull MessageContext messageContext, @Nullable Exception ex) throws WebServiceClientException {
         }
-
-
     }
 
     @Bean
@@ -211,17 +211,16 @@ class Client3Configuration {
         return marshaller;
     }
 
-    @Bean
-    Wss4jSecurityInterceptor wss4jSecurityInterceptor() {
-        var interceptor = new Wss4jSecurityInterceptor();
-
-        return interceptor;
-    }
 
     @Bean
-    WebServiceTemplate webServiceTemplate(Jaxb2Marshaller jaxb2Marshaller, WebServiceTemplateBuilder builder,
-                                          Wss4jSecurityInterceptor wss4jSecurityInterceptor) {
-        return builder.interceptors(wss4jSecurityInterceptor)
+    WebServiceTemplate webServiceTemplate(
+            OAuthBearerSecurityInterceptor oAuthBearerSecurityInterceptor,
+            Jaxb2Marshaller jaxb2Marshaller,
+            WebServiceTemplateBuilder builder
+    ) {
+        return builder
+                .interceptors(
+                        oAuthBearerSecurityInterceptor)
                 .setDefaultUri("http://localhost:8080/ws")
                 .setMarshaller(jaxb2Marshaller)
                 .setUnmarshaller(jaxb2Marshaller)
@@ -253,34 +252,8 @@ class ClientController {
     }
 
     @GetMapping("/oauth")
-    String oauthSecuredWebServiceTemplate(@RegisteredOAuth2AuthorizedClient OAuth2AuthorizedClient client)
+    String oauthSecuredWebServiceTemplate()
             throws Exception {
-        var xml =
-                """
-                        <wsse:Security xmlns:wsse="http://schemas.xmlsoap.org/ws/2002/07/secext">
-                            <wsse:UsernameToken>
-                                <wsse:Username>user</wsse:Username>
-                                <wsse:Password>password</wsse:Password>
-                            </wsse:UsernameToken>
-                        </wsse:Security>
-                        """;
-
-        var source = new StringSource(yourSoapPayload);
-
-
-        var response = this.ws.sendSourceAndReceive(
-                source,
-                message -> {
-                    var soapMessage = (SoapMessage) message;
-                    var header = Objects.requireNonNull(soapMessage).getSoapHeader();
-                    var transformer = TransformerFactory.newInstance().newTransformer();
-                    transformer.transform(new StringSource(xml), header.getResult());
-                    return soapMessage.getSoapBody();
-                }
-        );
-        //
-
-        var token = client.getAccessToken().getTokenValue();
         var doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
         var getMeElement = doc.createElementNS("http://example.com/ws", "getMeRequest");
         var request = new DOMSource(getMeElement);
