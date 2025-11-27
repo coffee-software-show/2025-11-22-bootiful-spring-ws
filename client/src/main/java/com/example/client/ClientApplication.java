@@ -107,6 +107,9 @@ class Client2Configuration {
 
 }
 
+/**
+ * demonstrates OAuth
+ */
 @Profile("three")
 @Configuration
 class Client3Configuration {

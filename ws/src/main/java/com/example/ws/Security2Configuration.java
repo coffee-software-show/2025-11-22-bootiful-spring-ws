@@ -1,23 +1,15 @@
 package com.example.ws;
 
-import org.apache.wss4j.common.ext.WSSecurityException;
 import org.apache.wss4j.dom.WSConstants;
 import org.apache.wss4j.dom.engine.WSSConfig;
-import org.apache.wss4j.dom.handler.RequestData;
-import org.apache.wss4j.dom.validate.Credential;
-import org.apache.wss4j.dom.validate.Validator;
 import org.jspecify.annotations.NonNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
@@ -90,7 +82,7 @@ class Security2Configuration extends AbstractSecurityConfiguration {
 
 
     @Bean
-    DaoAuthenticationProvider daoAuthenticationProvider( UserDetailsService userDetailsService) {
+    DaoAuthenticationProvider daoAuthenticationProvider(UserDetailsService userDetailsService) {
         return new DaoAuthenticationProvider(userDetailsService);
     }
 
@@ -99,39 +91,19 @@ class Security2Configuration extends AbstractSecurityConfiguration {
         return new UserDetailsServiceUsernameTokenValidator(daoAuthenticationProvider);
     }
 
+    static class UserDetailsServiceUsernameTokenValidator extends AbstractAuthenticationProviderValidator {
 
-    static class UserDetailsServiceUsernameTokenValidator implements Validator {
-
-        private final Logger log = LoggerFactory.getLogger(getClass());
-
-        private final DaoAuthenticationProvider daoAuthenticationProvider;
-
-        UserDetailsServiceUsernameTokenValidator(DaoAuthenticationProvider authenticationProvider) {
-            this.daoAuthenticationProvider = authenticationProvider;
-        }
-
-        @Override
-        public Credential validate(Credential credential, RequestData data) throws WSSecurityException {
-            try {
+        UserDetailsServiceUsernameTokenValidator(DaoAuthenticationProvider jwtAuthenticationProvider) {
+            super(jwtAuthenticationProvider, (credential, _) -> {
                 var credentialUsernametoken = credential.getUsernametoken();
                 var pw = credentialUsernametoken.getPassword();
                 var name = credentialUsernametoken.getName();
-                var usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(name, pw);
-                var authenticated = this.daoAuthenticationProvider.authenticate(usernamePasswordAuthenticationToken);
-                if (authenticated.isAuthenticated()) {
-                    SecurityContextHolder.getContext().setAuthentication(authenticated);
-                    return credential;
-                }
-            } //
-            catch (UsernameNotFoundException e) {
-                // we'll fall through to the exception thrown below.
-                this.log.warn("couldn't authenticate! {} ", e.getMessage());
-            }
-            throw new WSSecurityException(WSSecurityException.ErrorCode.FAILED_AUTHENTICATION);
+                return new UsernamePasswordAuthenticationToken(name, pw);
+            });
+
         }
 
+
     }
-
-
 }
 
