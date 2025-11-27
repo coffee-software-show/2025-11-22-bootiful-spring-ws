@@ -67,7 +67,7 @@ class CountryEndpoint {
     }
 }
 ```
-* Spring WS is a framework for building SOAP-based services. SOAP assumes XML. Spring has a lot of rich support for XML processing, obviously. In Spring Framework itself, there's a very interesting module called Spring OXM that contains marshallers and unmarshallers for marshalling objects to and from XML. This package was contributed, not surprisingly, by  Arjne Poutsma, the creator and first lead of the Spring WS project. 
+* Spring WS is a framework for building SOAP-based services. SOAP assumes XML. Spring has a lot of rich support for XML processing, obviously. In Spring Framework itself, there's a very interesting module called Spring OXM that contains marshallers and unmarshallers for marshalling objects to and from XML. This package was contributed, not surprisingly, by  Arjen Poutsma, the creator and first lead of the Spring WS project. 
 * we can try this out two ways, from the CLI, and using Spring's `WebServicesTemplate`. Let's try it out from the CLI.
 * add the following XMl to a document called `request-1.xml`:
 ```xml
@@ -132,7 +132,7 @@ class ClientController {
 * anyway, since Spring WS assumes a Servlet container and runtime, as opposed to a reactive runtime like Netty, you'll want to enable virtual threads: `spring.threads.virtual.enabled=true`, on both the client and the service.
 
 
-## act 2: GraalVM native images 
+## act 2: graalvm native images 
 * so far we've been running the service embedded in the Spring Boot application. obviously, today there are many ways to dramatically improve the runtime efficiency of JVM-based code. One of my favorites is to use GraalVM to pre-compile a JVm program into native code. 
 * I wondered how difficult it might be to do that for a Spring WS application. It's not _too_ bad, though I'll tell you it wasn't trivial, either. anyway, ive packaged up all the work in my little aggregation project, [here](https://github.com/bootiful-spring-graalvm/hints). this project is not an official project and is in no way maintained or supported. but, for this application in this moment, it works. it's apache 2 licensed so you can always go here and just grab the bits yourself.
 
@@ -162,7 +162,7 @@ class ClientController {
 
 
 
-
+## act 4: oauth 
 
 
 
