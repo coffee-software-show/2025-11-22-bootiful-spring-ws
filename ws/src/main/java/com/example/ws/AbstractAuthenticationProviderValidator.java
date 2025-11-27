@@ -17,34 +17,35 @@ import java.util.function.BiFunction;
 
 abstract class AbstractAuthenticationProviderValidator implements Validator {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+	private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final SecurityContextHolderStrategy securityContextHolderStrategy = SecurityContextHolder.getContextHolderStrategy();
+	private final SecurityContextHolderStrategy securityContextHolderStrategy = SecurityContextHolder
+		.getContextHolderStrategy();
 
-    private final AuthenticationProvider authenticationProvider;
+	private final AuthenticationProvider authenticationProvider;
 
-    private final BiFunction<Credential, RequestData, Authentication> authenticationFunction;
+	private final BiFunction<Credential, RequestData, Authentication> authenticationFunction;
 
-    AbstractAuthenticationProviderValidator(@NonNull AuthenticationProvider authenticationProvider,
-                                            @NonNull BiFunction<Credential, RequestData, Authentication> authenticationFunction) {
-        this.authenticationProvider = authenticationProvider;
-        this.authenticationFunction = authenticationFunction;
-    }
+	AbstractAuthenticationProviderValidator(@NonNull AuthenticationProvider authenticationProvider,
+			@NonNull BiFunction<Credential, RequestData, Authentication> authenticationFunction) {
+		this.authenticationProvider = authenticationProvider;
+		this.authenticationFunction = authenticationFunction;
+	}
 
-    @Override
-    public Credential validate(Credential credential, RequestData data) throws WSSecurityException {
-        try {
-            var authentication = this.authenticationFunction.apply(credential, data);
-            var authenticated = this.authenticationProvider.authenticate(authentication);
-            if (authenticated != null && authenticated.isAuthenticated()) {
-                this.securityContextHolderStrategy.getContext().setAuthentication(authenticated);
-                return credential;
-            }
-        } //
-        catch (Exception e) {
-            this.log.warn("couldn't authenticate! {} ", e.getMessage());
-        }
-        throw new WSSecurityException(WSSecurityException.ErrorCode.FAILED_AUTHENTICATION);
-    }
+	@Override
+	public Credential validate(Credential credential, RequestData data) throws WSSecurityException {
+		try {
+			var authentication = this.authenticationFunction.apply(credential, data);
+			var authenticated = this.authenticationProvider.authenticate(authentication);
+			if (authenticated != null && authenticated.isAuthenticated()) {
+				this.securityContextHolderStrategy.getContext().setAuthentication(authenticated);
+				return credential;
+			}
+		} //
+		catch (Exception e) {
+			this.log.warn("couldn't authenticate! {} ", e.getMessage());
+		}
+		throw new WSSecurityException(WSSecurityException.ErrorCode.FAILED_AUTHENTICATION);
+	}
+
 }
-
