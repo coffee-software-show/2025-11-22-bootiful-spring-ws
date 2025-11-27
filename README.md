@@ -565,8 +565,271 @@ public class AuthApplication {
 }
 
 ```
-
 * Start it. it'll be at port `9090`.
+* now let's modify the Spring WS service to expect an OAuth _bearer token_ and then reject the request if the token's not valid.
+* delete the existing configuration and replace it with the following one.
+```java
+package com.example.ws;
+
+import org.apache.wss4j.dom.WSConstants;
+import org.apache.wss4j.dom.engine.WSSConfig;
+import org.apache.wss4j.dom.engine.WSSecurityEngineResult;
+import org.jspecify.annotations.NonNull;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.BearerTokenAuthenticationToken;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationProvider;
+import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityInterceptor;
+import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityValidationException;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+@Configuration
+class OAuthAuthenticationSecurityConfiguration extends AbstractSecurityConfiguration {
+
+	OAuthAuthenticationSecurityConfiguration(
+			ObjectProvider<@NonNull Wss4jSecurityInterceptor> wss4jSecurityInterceptors) {
+		super(wss4jSecurityInterceptors);
+	}
+
+	@Bean
+	JwtAuthenticationProvider jwtAuthenticationProvider(JwtDecoder decoder) {
+		return new JwtAuthenticationProvider(decoder);
+	}
+
+	@Bean
+	JwtDecoder jwtDecoder(@Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuerUri) {
+		return NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
+	}
+
+	@Bean
+	JwtAuthenticationConverter jwtAuthenticationConverter() {
+		return new JwtAuthenticationConverter();
+	}
+
+	@Bean
+	OauthTokenBinaryTokenValidator oauthTokenBinaryTokenValidator(JwtAuthenticationProvider authenticationProvider) {
+		return new OauthTokenBinaryTokenValidator(authenticationProvider);
+	}
+
+	@Bean
+	@Override
+	WSSConfig wssConfig() {
+		var wssconfig = WSSConfig.getNewInstance();
+		wssconfig.setValidator(WSConstants.BINARY_TOKEN, this.oauthTokenBinaryTokenValidator(null));
+		return wssconfig;
+	}
+
+	@Bean
+	@Override
+	Wss4jSecurityInterceptor wss4jSecurityInterceptor(WSSConfig wssConfig) {
+		var ws4jsi = new Wss4jSecurityInterceptor() {
+			@Override
+			protected void checkResults(@NonNull List<WSSecurityEngineResult> results,
+					@NonNull List<Integer> validationActions) throws Wss4jSecurityValidationException {
+				// don't throw on imbalanced collection lengths
+			}
+		};
+		ws4jsi.setValidationActions("Timestamp");
+		ws4jsi.setWssConfig(wssConfig);
+		return ws4jsi;
+	}
+
+	static class OauthTokenBinaryTokenValidator extends AbstractAuthenticationProviderValidator {
+
+		OauthTokenBinaryTokenValidator(JwtAuthenticationProvider authenticationProvider) {
+			super(authenticationProvider, (credential, requestData) -> {
+				var binarySecurityToken = credential.getBinarySecurityToken();
+				var jwt = new String(binarySecurityToken.getToken(), StandardCharsets.UTF_8);
+				return new BearerTokenAuthenticationToken(jwt);
+			});
+		}
+	}
+}
+```
+* again, a lot of this is just the common stuff related to setting up the OAuth machinery in a Spring Security application without actually using the autoconfiguration since we don't want all of it. 
+* in the OAuth world, there are three logical components: an OAuth IDP (the "auth server"), an OAuth Resource Server (typically, a backend API with a filter installed that rejects requests that don't have a valid OAuth token in the body of the request), and an OAuth Client. We _could_ use Spring Security's handily configured Security OAuth Resource Server starter in which case all requests to the `/ws` endpoint would require a token. But again, we can't assume access to HTTP. Security is conveyed through transport-level security headers.
+* in this case, we need to extract the `BinarySecurityToken`, not the `Usernametoken`, and then ping the OAuth IDP and ask it to validate the token. We can reuse our existing abstract type, swapping out the `Authentication` as appropriate. This is done in the `OauthTokenBinaryTokenValidator`.
+* let's modify the client to now act as an OAuth client. When somebody hits the OAuth client without a token, the browser will force the client to redirect to our OAuth IDP where they can login and then redirect back to the OAuth client with a token. Once there, the original request we made will continue but with an authentication in the session. grab the JWT token from it and then relay it to the SOAP WS endpoint in a `Security` header in the request.
+* let's look at how to set that up in our client.
+* add the following properties to the client:
+```properties
+spring.application.name=client
+server.port=8081
+spring.security.oauth2.client.provider.spring.issuer-uri=http://localhost:9090
+spring.security.oauth2.client.registration.spring.provider=spring
+spring.security.oauth2.client.registration.spring.client-id=spring
+spring.security.oauth2.client.registration.spring.client-secret=spring
+spring.security.oauth2.client.registration.spring.authorization-grant-type=authorization_code
+spring.security.oauth2.client.registration.spring.client-authentication-method=client_secret_basic
+spring.security.oauth2.client.registration.spring.redirect-uri={baseUrl}/login/oauth2/code/{registrationId}
+spring.security.oauth2.client.registration.spring.scope=openid
+```
+* notice that we're specifying an issuer-uri _and_ the configuration of the OAuth client on the client side.
+* refactor the existing Java code to look like this. 
+```java
+
+package com.example.client;
+
+import com.example.ws.GetCountryRequest;
+import jakarta.xml.soap.SOAPException;
+import org.springframework.boot.webservices.client.WebServiceTemplateBuilder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import org.springframework.oxm.jaxb.Jaxb2Marshaller;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
+import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.ws.client.core.WebServiceTemplate;
+import org.springframework.ws.client.support.interceptor.ClientInterceptor;
+import org.springframework.ws.context.MessageContext;
+import org.springframework.ws.soap.saaj.SaajSoapMessage;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.Objects;
+import java.util.UUID;
+
+
+@Configuration
+class OAuthClientConfiguration {
+
+	@Bean
+	Jaxb2Marshaller jaxb2Marshaller() {
+		var marshaller = new Jaxb2Marshaller();
+		marshaller.setPackagesToScan(GetCountryRequest.class.getPackageName());
+		return marshaller;
+	}
+
+	@Bean
+	WebServiceTemplate webServiceTemplate(OauthTokenBinaryTokenClientInterceptor oAuthBearerSecurityInterceptor,
+			Jaxb2Marshaller jaxb2Marshaller, WebServiceTemplateBuilder builder) {
+		return builder //
+			.interceptors(oAuthBearerSecurityInterceptor) //
+			.setDefaultUri("http://localhost:8080/ws") //
+			.setMarshaller(jaxb2Marshaller) //
+			.setUnmarshaller(jaxb2Marshaller)
+			.build();
+	}
+
+	@Bean
+	OauthTokenBinaryTokenClientInterceptor oAuthBearerSecurityInterceptor(
+			OAuth2AuthorizedClientManager authorizedClientManager) {
+		return new OauthTokenBinaryTokenClientInterceptor(authorizedClientManager);
+	}
+
+	static class OauthTokenBinaryTokenClientInterceptor implements ClientInterceptor {
+
+		private static final String WSSE_NS = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd";
+
+		private static final String WSU_NS = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd";
+
+		private static final String ENCODING_TYPE = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary";
+
+		private static final String VALUE_TYPE_JWT = "urn:ietf:params:oauth:token-type:jwt";
+
+		private final SecurityContextHolderStrategy securityContextHolderStrategy = SecurityContextHolder
+			.getContextHolderStrategy();
+
+		private final OAuth2AuthorizedClientManager authorizedClientManager;
+
+		OauthTokenBinaryTokenClientInterceptor(OAuth2AuthorizedClientManager authorizedClientManager) {
+			this.authorizedClientManager = authorizedClientManager;
+		}
+
+		private String token() {
+			var principal = this.securityContextHolderStrategy.getContext().getAuthentication();
+			if (principal instanceof OAuth2AuthenticationToken auth2AuthenticationToken) {
+				var clientRegistrationId = auth2AuthenticationToken.getAuthorizedClientRegistrationId();
+				var authorizeRequest = OAuth2AuthorizeRequest.withClientRegistrationId(clientRegistrationId)
+					.principal(auth2AuthenticationToken)
+					.build();
+				var oAuth2AuthorizedClient = this.authorizedClientManager.authorize(authorizeRequest);
+				return Objects.requireNonNull(oAuth2AuthorizedClient).getAccessToken().getTokenValue();
+			}
+			throw new IllegalStateException("couldn't resolve the registered client id and an associated token!");
+		}
+
+		@Override
+		public boolean handleRequest(MessageContext messageContext) {
+			var message = messageContext.getRequest();
+			if (message instanceof SaajSoapMessage soapMessage) {
+				try {
+					this.addBinarySecurityToken(soapMessage, this.token());
+				}
+				catch (SOAPException e) {
+					throw new RuntimeException("Failed to add BinarySecurityToken to SOAP header", e);
+				}
+			}
+			return true;
+		}
+
+		private void addBinarySecurityToken(SaajSoapMessage saajMessage, String jwt) throws SOAPException {
+			var soapMessage = saajMessage.getSaajMessage();
+			var envelope = soapMessage.getSOAPPart().getEnvelope();
+			var header = envelope.getHeader();
+			if (header == null) {
+				header = envelope.addHeader();
+			}
+			var securityName = envelope.createName("Security", "wsse", WSSE_NS);
+			var securityHeader = header.addHeaderElement(securityName);
+			var bstName = envelope.createName("BinarySecurityToken", "wsse", WSSE_NS);
+			var bst = securityHeader.addChildElement(bstName);
+			bst.addAttribute(envelope.createName("ValueType"), VALUE_TYPE_JWT);
+			bst.addAttribute(envelope.createName("EncodingType"), ENCODING_TYPE);
+			var wsuIdName = envelope.createName("Id", "wsu", WSU_NS);
+			bst.addAttribute(wsuIdName, "jwt-" + UUID.randomUUID());
+			var encoded = Base64.getEncoder().encodeToString(jwt.getBytes(StandardCharsets.UTF_8));
+			bst.addTextNode(encoded);
+		}
+
+		@Override
+		public boolean handleResponse(MessageContext messageContext) {
+			return true;
+		}
+
+		@Override
+		public boolean handleFault(MessageContext messageContext) {
+			return true;
+		}
+
+		@Override
+		public void afterCompletion(MessageContext messageContext, Exception ex) {
+		}
+	}
+
+}
+
+
+```
+* add the following endpoint to the controller.
+```java
+    
+    @GetMapping("/oauth")
+	String oauthSecuredWebServiceTemplate() throws Exception {
+		var doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
+		var getMeElement = doc.createElementNS("http://example.com/ws", "getMeRequest");
+		var request = new DOMSource(getMeElement);
+		var response = new StringResult();
+		this.ws.sendSourceAndReceiveToResult(request, response);
+		return response.toString();
+	}
+
+```
+* you can try it all out by hitting `http://127.0.0.1:8081/oauth`. You'll be redirected to the OAuth IDP. You'll be redirected to the OAuth client where your original request will be continued, this time with a valid OAuth token in tow, which you'll relay to the downstream OAuth resource server. 
+* the downstream OAuth resource server will extract the token, call the OAuth IDP to validate it, and then allow or rejet the request. 
+* Nice!
+
 
 ## graalvm native images
 
@@ -578,7 +841,20 @@ public class AuthApplication {
   project, [here](https://github.com/bootiful-spring-graalvm/hints). this project is not an official project and is in
   no way maintained or supported. but, for this application in this moment, it works. it's apache 2 licensed so you can
   always go here and just grab the bits yourself.
-* i've added this to the build for both `client` and `ws` : `com.joshlong` : `hints` : `0.0.13`.
+* i've added this to the build for both `client` and `ws`: `com.joshlong`:`hints`:`0.0.13`.
+* add the following GraalVM `RuntimeHintsRegistrar` to the `client`:
+```java
+
+    static class Hints implements RuntimeHintsRegistrar {
+
+		@Override
+		public void registerHints(RuntimeHints hints, @Nullable ClassLoader classLoader) {
+			hints.resources().registerResource(REQUEST_RESOURCE);
+		}
+
+	}
+
+```
 * now compile them both thusly: `./mvnw -DskipTests -Pnative native:compile`. run the application, and, huzzah! you've
   got a lightning fast and super lightweight application that starts in no time at all. and just _look_ at that RAM! 
 
