@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Configuration
-// @Profile("oauth")
+@Profile("oauth")
 class OAuthAuthenticationSecurityConfiguration extends AbstractSecurityConfiguration {
 
 	OAuthAuthenticationSecurityConfiguration(
