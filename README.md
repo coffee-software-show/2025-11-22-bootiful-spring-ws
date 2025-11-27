@@ -192,6 +192,13 @@ String usernamePassworedSecuredWebServiceTemplate() throws Exception {
 ```java
 
 @Bean
+Jaxb2Marshaller jaxb2Marshaller() {
+    var marshaller = new Jaxb2Marshaller();
+    marshaller.setPackagesToScan(GetCountryRequest.class.getPackageName());
+    return marshaller;
+}
+
+@Bean
 WebServiceTemplate webServiceTemplate(
         Jaxb2Marshaller jaxb2Marshaller,
         WebServiceTemplateBuilder builder) {
@@ -259,7 +266,7 @@ WebServiceTemplate webServiceTemplate(
 
 ## a typical WS-Security integration
 
-* let's look at a typical integration. we'll need WSS4J. add `org.springframework.boot`:`spring-boot-starter-security`. add `org.springframework.ws`:`spring-ws-security`, etc.
+* let's look at a typical integration. we'll need WSS4J. add `org.springframework.boot`:`spring-boot-starter-security`. add `org.springframework.ws`:`spring-ws-security`, etc. on the `ws` module.
 * we'll need some common beans in play for all of our integrations, so i've excised them out to a separate abstract super class.
 
 ```java
@@ -274,7 +281,7 @@ abstract class AbstractSecurityConfiguration implements WsConfigurer {
 
 	@Override
 	public void addInterceptors(List<EndpointInterceptor> interceptors) {
-		interceptors.add(wss4jSecurityInterceptors.getObject());
+		interceptors.add(this.wss4jSecurityInterceptors.getObject());
 	}
 
 	@Bean
@@ -298,7 +305,11 @@ abstract class AbstractSecurityConfiguration implements WsConfigurer {
 * we'll need to customize this interceptor and the `WSSConfig` that it will depend on, so these are left as `abstract` methods.
 * we want Spring Security to _not_ lock down requests to the SOAP handler, which is mounted, again, at `/ws`. The reason, again, is because we can't rely on transport-level security like HTTP BASIC, so the request needs to reach the Spring WS `MessageDispatcherServlet` where the message can be read, routed to WSS4J and ultimately passed to our Spring Security integration code to handle the challenge. 
 * so we'll disable CSRF, and permit all requests to the `spring.webservices.path`.
-* let's now look our first integration, this time using usernames and passwords. 
+
+## usernames and passwords 
+
+* let's now look at our first integration, this time using usernames and passwords.
+* on the service-side, introduce the following changes.
 
 ```java
 
@@ -321,8 +332,6 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityInterceptor;
 import org.springframework.ws.soap.security.wss4j2.callback.AbstractWsPasswordCallbackHandler;
 
-import javax.security.auth.callback.UnsupportedCallbackException;
-import java.io.IOException;
 import java.util.Set;
 
 @Configuration
@@ -391,20 +400,16 @@ class UsernameTokenAuthenticationSecurityConfiguration extends AbstractSecurityC
         UserDetailsServiceUsernameTokenValidator(DaoAuthenticationProvider jwtAuthenticationProvider) {
             super(jwtAuthenticationProvider, (credential, _) -> {
                 var credentialUsernametoken = credential.getUsernametoken();
-                var pw = credentialUsernametoken.getPassword();
-                var name = credentialUsernametoken.getName();
-                return new UsernamePasswordAuthenticationToken(name, pw);
+                return new UsernamePasswordAuthenticationToken(
+                        credentialUsernametoken.getName(),
+                        credentialUsernametoken.getPassword());
             });
         }
-
     }
-
 }
-
-
 ```
 * most of this configuration is standard Spring Security username and password handling. 
-* this includes the  `DaoAuthenticcationProvider`, which in turn delegates to a `UserDetailsService` integration (the `InMemoryUserDetailsManager`). This in turn delegates to a `PasswordEncoder` for hashing the passwords. Obviously it'd be trivial (nothing would change, conceptually) to instead use a `JdbcUserDetailsManager` and source the usernames and passwords from a SQL database. You'd still wanna use `PasswordEncoder` before writing the password to the SQL database, of course. Or you could implement your own `UserDetailsManager`.
+* this includes the  `DaoAuthenticationProvider`, which in turn delegates to a `UserDetailsService` integration (the `InMemoryUserDetailsManager`). This in turn delegates to a `PasswordEncoder` for hashing the passwords. Obviously it'd be trivial (nothing would change, conceptually) to instead use a `JdbcUserDetailsManager` and source the usernames and passwords from a SQL database. You'd still wanna use `PasswordEncoder` before writing the password to the SQL database, of course. Or you could implement your own `UserDetailsManager`.
 * important bits - the things that are really the crux of our integration - are the `UserDetailsServiceUsernameTokenValidator` (phew!) and the `WSSConfig`.
 * behind the scenes, there's a map of actions to validation handlers (basically just classes that get invoked to _handle_ validating a credential). we configure this in the `WSSConfig` class and we point it to an implementation of our `AbstractAuthenticationProviderValidator`, which looks like this:
 ```java
@@ -420,10 +425,148 @@ class UsernameTokenAuthenticationSecurityConfiguration extends AbstractSecurityC
     }
 }
 ```
- 
-## usernames and passwords
+* now let's rework the `client` to use the `WebServiceTemplate` to call the downstream service with the `username` and `password`.
+```java
 
-* fundamentally youre going to want to build a
+@Configuration
+class UsernameTokenClientConfiguration {
+
+	@Bean
+	Customizer<HttpSecurity> httpSecurityCustomizer() {
+		return h -> h.authorizeHttpRequests(ar -> ar.requestMatchers("/username").permitAll());
+	}
+
+	@Bean
+	Jaxb2Marshaller jaxb2Marshaller() {
+		var marshaller = new Jaxb2Marshaller();
+		marshaller.setPackagesToScan(GetCountryRequest.class.getPackageName());
+		return marshaller;
+	}
+
+	@Bean
+	Wss4jSecurityInterceptor wss4jSecurityInterceptor() {
+		var interceptor = new Wss4jSecurityInterceptor();
+		interceptor.setSecurementUsername("josh");
+		interceptor.setSecurementPassword("pw");
+		interceptor.setSecurementActions(WSHandlerConstants.USERNAME_TOKEN);
+		interceptor.setSecurementPasswordType(WSConstants.PW_TEXT);
+		return interceptor;
+	}
+
+	@Bean
+	WebServiceTemplate webServiceTemplate(Jaxb2Marshaller jaxb2Marshaller, WebServiceTemplateBuilder builder,
+			Wss4jSecurityInterceptor wss4jSecurityInterceptor) {
+		return builder //
+			.interceptors(wss4jSecurityInterceptor) //
+			.setDefaultUri("http://localhost:8080/ws") //
+			.setMarshaller(jaxb2Marshaller)//
+			.setUnmarshaller(jaxb2Marshaller)//
+			.build();
+	}
+
+}
+
+
+``` 
+
+* WSS4J and Spring WS, as a consequence, have this weird need to handle both inbound  and outbound requests in the same class. Things we do to secure an outbound request headed _to_ a service are called _securement_. Things intended to validate that an inbound request has the credentials required to call a SOAP service are called _validation_. 
+* if you look at the `Wss4jSecurityInterceptor`, you can see we're encoding the username and password as _securement_ usernames and passwords.
+* Open up the browser, hit `localhost:8081/username`, and you'll see that the controller will call the downstream SOAP service and return the authenticated user.
+
+## oauth 
+* obviously, usernames and passwords suck. they represent long term credentials tied to a user context, but this isn't a good way to secure a distributed system. 
+* these days, its much saner to issue a short term token tied to the user. the token can be validated much more efficiently than a password which must be encoded each time its used. 
+* encoders like BCrypt can take a long time! it's a feature, not a bug.
+* but with tokens you can avoid this. you don't to match a plaintext password using an encoder and compare it with an existing one, instead u just need to validate that a token is valid.
+* and tokens are better security posture, as well. you can revoke a token even without forcing the user to reset the password.
+* and thats actually a good plan, too. tokens _should_ be short-lived! the les they exist, the less risk they can be compromised. 
+* we can use Spring's OAuth stack with any valid OAuth IDP but in this case to keep things simple, we'll setup the Spring Authorization Server. Go to the [Spring Initializr](https://start.spring.io) and add `Authorization Server`, `Web`, and `WebAuthn`.
+* configure the application properties file, `application.yml`:
+
+```yaml
+spring:
+  security:
+    oauth2:
+      authorizationserver:
+        client:
+          oidc-client:
+            registration:
+
+              client-id: "spring"
+              client-secret: "{noop}spring"
+              client-authentication-methods:
+                - "client_secret_basic"
+              authorization-grant-types:
+                - "authorization_code"
+                # - "client_credentials"
+                - "refresh_token"
+              redirect-uris:
+                - "http://127.0.0.1:8081/login/oauth2/code/spring"
+              scopes:
+                - "openid"
+                - "profile"
+
+
+  application:
+    name: auth
+server:
+  port: 9090
+
+
+```
+* here's the code for the Spring Authorization Server, too: 
+```java
+
+package com.example.auth;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+import org.springframework.http.MediaType;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+
+@SpringBootApplication
+public class AuthApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(AuthApplication.class, args);
+	}
+
+	@Bean
+	PasswordEncoder passwordEncoder() {
+		return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+	}
+
+	@Bean
+	InMemoryUserDetailsManager inMemoryUserDetailsManager(PasswordEncoder pw) {
+		return new InMemoryUserDetailsManager(
+				User.withUsername("josh").password(pw.encode("pw")).roles("ADMIN", "USER").build(),
+				User.withUsername("rob").password(pw.encode("pw")).roles("USER").build(),
+				User.withUsername("james").password(pw.encode("pw")).roles("ADMIN", "USER").build());
+	}
+
+	//
+	@Bean
+	Customizer<HttpSecurity> httpSecurityCustomizer() {
+		return http -> http.oauth2AuthorizationServer(a -> a.oidc(Customizer.withDefaults()))
+			.webAuthn(w -> w.allowedOrigins("http://localhost:8080").rpName("bootiful").rpId("localhost"))
+			.oneTimeTokenLogin(o -> o.tokenGenerationSuccessHandler((request, response, oneTimeToken) -> {
+				response.getWriter().println("you've got console mail!");
+				response.setContentType(MediaType.TEXT_PLAIN_VALUE);
+				IO.println("please go to http://localhost:9090/login/ott?token=" + oneTimeToken.getTokenValue());
+			}));
+	}
+
+}
+
+```
+
+* Start it. it'll be at port `9090`.
 
 ## graalvm native images
 
