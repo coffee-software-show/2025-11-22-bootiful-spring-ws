@@ -3,7 +3,6 @@ package com.example.ws;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Repository;
 import org.springframework.ws.server.endpoint.annotation.Endpoint;
 import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
 import org.springframework.ws.server.endpoint.annotation.RequestPayload;
@@ -44,32 +43,20 @@ class CountryEndpoint {
 
 	private static final String NAMESPACE_URI = "http://example.com/ws";
 
-	private final CountryRepository countryRepository;
+	private final Map<String, Country> countries = new ConcurrentHashMap<>();
 
-	CountryEndpoint(CountryRepository countryRepository) {
-		this.countryRepository = countryRepository;
+	CountryEndpoint() {
+		this.add("Spain", "Madrid", Currency.EUR, 46704314);
+		this.add("Poland", "Warsaw", Currency.PLN, 38186860);
+		this.add("United Kingdom", "London", Currency.GBP, 63705000);
 	}
 
 	@ResponsePayload
 	@PayloadRoot(namespace = NAMESPACE_URI, localPart = "getCountryRequest")
 	GetCountryResponse getCountry(@RequestPayload GetCountryRequest request) {
 		var response = new GetCountryResponse();
-		response.setCountry(this.countryRepository.findCountry(request.getName()));
+		response.setCountry(this.countries.get(request.getName()));
 		return response;
-	}
-
-}
-
-@Repository
-class CountryRepository {
-
-	private final Map<String, Country> countries = new ConcurrentHashMap<>();
-
-	CountryRepository() {
-		this.add("Spain", "Madrid", Currency.EUR, 46704314);
-		this.add("Poland", "Warsaw", Currency.PLN, 38186860);
-		this.add("United Kingdom", "London", Currency.GBP, 63705000);
-		IO.println(this.countries);
 	}
 
 	private void add(String name, String capital, Currency currency, int population) {
@@ -81,10 +68,6 @@ class CountryRepository {
 			country.setPopulation(population);
 			return country;
 		});
-	}
-
-	public Country findCountry(String name) {
-		return this.countries.get(name);
 	}
 
 }

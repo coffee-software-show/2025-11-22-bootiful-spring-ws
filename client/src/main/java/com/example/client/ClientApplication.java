@@ -70,15 +70,9 @@ public class ClientApplication {
 @Configuration
 class Client2Configuration {
 
-	// let's NOT lock down the ws endpoint since it's just a username/pw in this case, not
-	// an OAuth client
 	@Bean
 	Customizer<HttpSecurity> httpSecurityCustomizer() {
-		return httpSecurity -> httpSecurity.authorizeHttpRequests(a -> a.requestMatchers("/ws")
-			.permitAll() //
-			.requestMatchers("/username")
-			.permitAll() //
-		);
+		return h -> h.authorizeHttpRequests(ar -> ar.requestMatchers("/username").permitAll());
 	}
 
 	@Bean
@@ -91,9 +85,9 @@ class Client2Configuration {
 	@Bean
 	Wss4jSecurityInterceptor wss4jSecurityInterceptor() {
 		var interceptor = new Wss4jSecurityInterceptor();
-		interceptor.setSecurementActions(WSHandlerConstants.USERNAME_TOKEN);
 		interceptor.setSecurementUsername("josh");
 		interceptor.setSecurementPassword("pw");
+		interceptor.setSecurementActions(WSHandlerConstants.USERNAME_TOKEN);
 		interceptor.setSecurementPasswordType(WSConstants.PW_TEXT);
 		return interceptor;
 	}
@@ -111,6 +105,9 @@ class Client2Configuration {
 
 }
 
+/**
+ * demonstrates OAuth
+ */
 // @Profile("three")
 @Configuration
 class Client3Configuration {
