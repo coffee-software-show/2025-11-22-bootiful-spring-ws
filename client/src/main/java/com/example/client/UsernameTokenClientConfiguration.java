@@ -6,16 +6,14 @@ import org.apache.wss4j.dom.handler.WSHandlerConstants;
 import org.springframework.boot.webservices.client.WebServiceTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.oxm.jaxb.Jaxb2Marshaller;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.ws.client.core.WebServiceTemplate;
 import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityInterceptor;
 
-/**
- * demonstrates using a username/password
- */
-// @Profile("two")
+@Profile("username")
 @Configuration
 class UsernameTokenClientConfiguration {
 

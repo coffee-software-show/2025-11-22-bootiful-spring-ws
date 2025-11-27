@@ -17,8 +17,6 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityInterceptor;
 import org.springframework.ws.soap.security.wss4j2.callback.AbstractWsPasswordCallbackHandler;
 
-import javax.security.auth.callback.UnsupportedCallbackException;
-import java.io.IOException;
 import java.util.Set;
 
 @Configuration
@@ -46,8 +44,7 @@ class UsernameTokenAuthenticationSecurityConfiguration extends AbstractSecurityC
 		ws4jsi.setWssConfig(wssConfig);
 		ws4jsi.setValidationCallbackHandler(new AbstractWsPasswordCallbackHandler() {
 			@Override
-			protected void handleUsernameToken(WSPasswordCallback callback)
-					throws IOException, UnsupportedCallbackException {
+			protected void handleUsernameToken(@NonNull WSPasswordCallback callback) {
 				// noop. don't care. the validator will do the hardest work.
 			}
 		});
@@ -89,9 +86,8 @@ class UsernameTokenAuthenticationSecurityConfiguration extends AbstractSecurityC
 		UserDetailsServiceUsernameTokenValidator(DaoAuthenticationProvider jwtAuthenticationProvider) {
 			super(jwtAuthenticationProvider, (credential, _) -> {
 				var credentialUsernametoken = credential.getUsernametoken();
-				var pw = credentialUsernametoken.getPassword();
-				var name = credentialUsernametoken.getName();
-				return new UsernamePasswordAuthenticationToken(name, pw);
+				return new UsernamePasswordAuthenticationToken(credentialUsernametoken.getName(),
+						credentialUsernametoken.getPassword());
 			});
 		}
 

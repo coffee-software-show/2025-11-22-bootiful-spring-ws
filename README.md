@@ -302,90 +302,124 @@ abstract class AbstractSecurityConfiguration implements WsConfigurer {
 
 ```java
 
+package com.example.ws;
+
+import org.apache.wss4j.common.ext.WSPasswordCallback;
+import org.apache.wss4j.dom.WSConstants;
+import org.apache.wss4j.dom.engine.WSSConfig;
+import org.jspecify.annotations.NonNull;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityInterceptor;
+import org.springframework.ws.soap.security.wss4j2.callback.AbstractWsPasswordCallbackHandler;
+
+import javax.security.auth.callback.UnsupportedCallbackException;
+import java.io.IOException;
+import java.util.Set;
 
 @Configuration
 class UsernameTokenAuthenticationSecurityConfiguration extends AbstractSecurityConfiguration {
 
-	UsernameTokenAuthenticationSecurityConfiguration(
-			ObjectProvider<@NonNull Wss4jSecurityInterceptor> wss4jSecurityInterceptors) {
-		super(wss4jSecurityInterceptors);
-	}
+    UsernameTokenAuthenticationSecurityConfiguration(
+            ObjectProvider<@NonNull Wss4jSecurityInterceptor> wss4jSecurityInterceptors) {
+        super(wss4jSecurityInterceptors);
+    }
 
-	@Bean
-	@Override
-	WSSConfig wssConfig() {
-		var wssconfig = WSSConfig.getNewInstance();
-		wssconfig.setValidator(WSConstants.USERNAME_TOKEN, this.userDetailsServiceUsernameTokenValidator(null));
-		return wssconfig;
-	}
+    @Bean
+    @Override
+    WSSConfig wssConfig() {
+        var wssconfig = WSSConfig.getNewInstance();
+        wssconfig.setValidator(WSConstants.USERNAME_TOKEN, this.userDetailsServiceUsernameTokenValidator(null));
+        return wssconfig;
+    }
 
-	@Bean
-	SpringSecurityPasswordValidationCallbackHandler springSecurityPasswordValidationCallbackHandler(
-			UserDetailsService detailsService) {
-		var h = new SpringSecurityPasswordValidationCallbackHandler();
-		h.setUserDetailsService(detailsService);
-		return h;
-	}
+    @Bean
+    @Override
+    Wss4jSecurityInterceptor wss4jSecurityInterceptor(WSSConfig wssConfig) {
+        var ws4jsi = new Wss4jSecurityInterceptor();
+        ws4jsi.setValidationActions("UsernameToken");
+        ws4jsi.setWssConfig(wssConfig);
+        ws4jsi.setValidationCallbackHandler(new AbstractWsPasswordCallbackHandler() {
+            @Override
+            protected void handleUsernameToken(@NonNull WSPasswordCallback callback) {
+                // noop. don't care. the validator will do the hardest work.
+            }
+        });
+        return ws4jsi;
+    }
 
-	@Bean
-	@Override
-	Wss4jSecurityInterceptor wss4jSecurityInterceptor(WSSConfig wssConfig) {
-		var callbackHandler = this.springSecurityPasswordValidationCallbackHandler(null);
-		var ws4jsi = new Wss4jSecurityInterceptor();
-		ws4jsi.setValidationActions("UsernameToken");
-		ws4jsi.setWssConfig(wssConfig);
-		ws4jsi.setValidationCallbackHandler(callbackHandler);
-		return ws4jsi;
-	}
+    @Bean
+    PasswordEncoder passwordEncoder() {
+        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+    }
 
-	@Bean
-	PasswordEncoder passwordEncoder() {
-		return PasswordEncoderFactories.createDelegatingPasswordEncoder();
-	}
+    @Bean
+    InMemoryUserDetailsManager inMemoryUserDetailsManager(PasswordEncoder passwordEncoder) {
+        var users = Set.of("stephane", "rob", "josh")
+                .stream()
+                .map(username -> User //
+                        .withUsername(username)//
+                        .password(passwordEncoder.encode("pw"))
+                        .roles("USER") //
+                        .build() //
+                )
+                .toList();
+        return new InMemoryUserDetailsManager(users);
+    }
 
-	@Bean
-	InMemoryUserDetailsManager inMemoryUserDetailsManager(PasswordEncoder passwordEncoder) {
-		var users = Set.of("stephane", "rob", "josh")
-			.stream()
-			.map(username -> User //
-				.withUsername(username)//
-				.password(passwordEncoder.encode("pw"))
-				.roles("USER") //
-				.build() //
-			)
-			.toList();
-		return new InMemoryUserDetailsManager(users);
-	}
+    @Bean
+    DaoAuthenticationProvider daoAuthenticationProvider(UserDetailsService userDetailsService) {
+        return new DaoAuthenticationProvider(userDetailsService);
+    }
 
-	@Bean
-	DaoAuthenticationProvider daoAuthenticationProvider(UserDetailsService userDetailsService) {
-		return new DaoAuthenticationProvider(userDetailsService);
-	}
+    @Bean
+    UserDetailsServiceUsernameTokenValidator userDetailsServiceUsernameTokenValidator(
+            DaoAuthenticationProvider daoAuthenticationProvider) {
+        return new UserDetailsServiceUsernameTokenValidator(daoAuthenticationProvider);
+    }
 
-	@Bean
-	UserDetailsServiceUsernameTokenValidator userDetailsServiceUsernameTokenValidator(
-			DaoAuthenticationProvider daoAuthenticationProvider) {
-		return new UserDetailsServiceUsernameTokenValidator(daoAuthenticationProvider);
-	}
+    static class UserDetailsServiceUsernameTokenValidator extends AbstractAuthenticationProviderValidator {
 
-	static class UserDetailsServiceUsernameTokenValidator extends AbstractAuthenticationProviderValidator {
+        UserDetailsServiceUsernameTokenValidator(DaoAuthenticationProvider jwtAuthenticationProvider) {
+            super(jwtAuthenticationProvider, (credential, _) -> {
+                var credentialUsernametoken = credential.getUsernametoken();
+                var pw = credentialUsernametoken.getPassword();
+                var name = credentialUsernametoken.getName();
+                return new UsernamePasswordAuthenticationToken(name, pw);
+            });
+        }
 
-		UserDetailsServiceUsernameTokenValidator(DaoAuthenticationProvider jwtAuthenticationProvider) {
-			super(jwtAuthenticationProvider, (credential, _) -> {
-				var credentialUsernametoken = credential.getUsernametoken();
-				var pw = credentialUsernametoken.getPassword();
-				var name = credentialUsernametoken.getName();
-				return new UsernamePasswordAuthenticationToken(name, pw);
-			});
-		}
+    }
 
-	}
 }
+
 
 ```
 * most of this configuration is standard Spring Security username and password handling. 
-* this includes the  `DaoAuthenticcationProvider`, which in turn delegates to a `UserDetailsService` integration (the `InMemoryUserDetailsManager`). This in turn delegates to a `PasswordEncoder` for hashing the passwords. Obviously it'd be trivial (nothing would change, conceptually) to instead use a `JdbcUserDetailsManager` and source the usernames and passwords from a SQL database. You'd still wanna use `PasswordEncoder` before writing the password to the SQL database, of course. Or you could implement your own `UserDetailsManager`. 
+* this includes the  `DaoAuthenticcationProvider`, which in turn delegates to a `UserDetailsService` integration (the `InMemoryUserDetailsManager`). This in turn delegates to a `PasswordEncoder` for hashing the passwords. Obviously it'd be trivial (nothing would change, conceptually) to instead use a `JdbcUserDetailsManager` and source the usernames and passwords from a SQL database. You'd still wanna use `PasswordEncoder` before writing the password to the SQL database, of course. Or you could implement your own `UserDetailsManager`.
+* important bits - the things that are really the crux of our integration - are the `UserDetailsServiceUsernameTokenValidator` (phew!) and the `WSSConfig`.
+* behind the scenes, there's a map of actions to validation handlers (basically just classes that get invoked to _handle_ validating a credential). we configure this in the `WSSConfig` class and we point it to an implementation of our `AbstractAuthenticationProviderValidator`, which looks like this:
+```java
+  static class UserDetailsServiceUsernameTokenValidator extends AbstractAuthenticationProviderValidator {
 
+    UserDetailsServiceUsernameTokenValidator(DaoAuthenticationProvider jwtAuthenticationProvider) {
+        super(jwtAuthenticationProvider, (credential, _) -> {
+            var credentialUsernametoken = credential.getUsernametoken();
+            return new UsernamePasswordAuthenticationToken(
+                    credentialUsernametoken.getName(),
+                    credentialUsernametoken.getPassword());
+        });
+    }
+}
+```
  
 ## usernames and passwords
 
