@@ -1,7 +1,11 @@
 package com.example.client;
 
+import com.example.ws.Country;
 import com.example.ws.GetCountryRequest;
+import com.example.ws.GetCountryResponse;
+import com.example.ws.GetMeResponse;
 import jakarta.xml.soap.SOAPException;
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.webservices.client.WebServiceTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,20 +23,24 @@ import org.springframework.ws.soap.saaj.SaajSoapMessage;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Currency;
 import java.util.Objects;
 import java.util.UUID;
 
-/**
- * demonstrates OAuth
- */
-@Profile("three")
+
 @Configuration
 class OAuthClientConfiguration {
 
 	@Bean
 	Jaxb2Marshaller jaxb2Marshaller() {
 		var marshaller = new Jaxb2Marshaller();
-		marshaller.setPackagesToScan(GetCountryRequest.class.getPackageName());
+		marshaller.setClassesToBeBound(
+            GetCountryRequest.class ,
+            GetCountryResponse.class ,
+            Country.class ,
+            Currency.class ,
+            GetMeResponse.class
+        );
 		return marshaller;
 	}
 
@@ -130,17 +138,17 @@ class OAuthClientConfiguration {
 		}
 
 		@Override
-		public boolean handleResponse(MessageContext messageContext) {
+		public boolean handleResponse(@NonNull MessageContext messageContext) {
 			return true;
 		}
 
 		@Override
-		public boolean handleFault(MessageContext messageContext) {
+		public boolean handleFault(@NonNull MessageContext messageContext) {
 			return true;
 		}
 
 		@Override
-		public void afterCompletion(MessageContext messageContext, Exception ex) {
+		public void afterCompletion(@NonNull MessageContext messageContext, Exception ex) {
 		}
 
 	}
