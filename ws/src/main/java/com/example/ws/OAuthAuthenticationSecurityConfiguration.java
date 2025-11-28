@@ -147,7 +147,7 @@ class OAuthAuthenticationSecurityConfiguration implements WsConfigurer {
 		@Override
 		public void afterCompletion(@NonNull MessageContext messageContext, @NonNull Object endpoint, Exception ex)
 				throws Exception {
-			SecurityContextHolder.clearContext();
+			this.securityContextHolderStrategy.clearContext();
 		}
 
 	}
