@@ -30,9 +30,11 @@
         <java.version>25</java.version>
     </properties>
     <dependencies>
+
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
+            <artifactId>spring-boot-starter-web-services</artifactId>
         </dependency>
 
         <dependency>
@@ -40,25 +42,11 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web-services</artifactId>
-        </dependency>
     </dependencies>
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.springframework.ws</groupId>
-                <artifactId>spring-ws-bom</artifactId>
-                <version>5.0.0</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
 
     <build>
         <plugins>
+
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>jaxb2-maven-plugin</artifactId>
@@ -77,20 +65,7 @@
                     </sources>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>io.spring.javaformat</groupId>
-                <artifactId>spring-javaformat-maven-plugin</artifactId>
-                <version>0.0.47</version>
-                <executions>
-                    <execution>
-                        <phase>validate</phase>
-                        <inherited>true</inherited>
-                        <goals>
-                            <goal>validate</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
+
         </plugins>
     </build>
 

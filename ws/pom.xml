@@ -35,21 +35,8 @@
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.joshlong</groupId>
-            <artifactId>hints</artifactId>
-            <version>0.0.13</version>
-        </dependency>
-         <dependency>
-            <groupId>org.springframework.ws</groupId>
-            <artifactId>spring-ws-security</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
+            <artifactId>spring-boot-starter-web-services</artifactId>
         </dependency>
         <dependency>
             <groupId>com.example</groupId>
@@ -57,13 +44,23 @@
             <version>0.0.1-SNAPSHOT</version>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web-services</artifactId>
+            <groupId>com.joshlong</groupId>
+            <artifactId>hints</artifactId>
+            <version>0.0.14</version>
         </dependency>
+
+      <!--  <dependency>
+            <groupId>org.springframework.ws</groupId>
+            <artifactId>spring-ws-security</artifactId>
+        </dependency>-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
         </dependency>
     </dependencies>
     <dependencyManagement>
@@ -72,29 +69,14 @@
                 <groupId>org.springframework.ws</groupId>
                 <artifactId>spring-ws-bom</artifactId>
                 <version>5.0.0</version>
-                <type>pom</type>
                 <scope>import</scope>
+                <type>pom</type>
             </dependency>
         </dependencies>
     </dependencyManagement>
 
     <build>
         <plugins>
-
-            <plugin>
-                <groupId>io.spring.javaformat</groupId>
-                <artifactId>spring-javaformat-maven-plugin</artifactId>
-                <version>0.0.47</version>
-                <executions>
-                    <execution>
-                        <phase>validate</phase>
-                        <inherited>true</inherited>
-                        <goals>
-                            <goal>validate</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <groupId>org.graalvm.buildtools</groupId>
                 <artifactId>native-maven-plugin</artifactId>
