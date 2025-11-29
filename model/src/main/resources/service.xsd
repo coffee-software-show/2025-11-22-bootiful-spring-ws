@@ -3,46 +3,27 @@
            targetNamespace="http://example.com/ws"
            elementFormDefault="qualified">
 
-    <xs:element name="getCountryRequest">
+    <xs:element name="messageResponse">
         <xs:complexType>
             <xs:sequence>
-                <xs:element name="name" type="xs:string"/>
+                <xs:element name="message" type="tns:message"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>
 
-    <xs:element name="getMeRequest"/>
-
-    <xs:element name="getMeResponse">
+    <xs:element name="messageRequest">
         <xs:complexType>
             <xs:sequence>
-                <xs:element name="name" type="xs:string"/>
+                <xs:element minOccurs="0" name="name" type="xs:string"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>
 
-    <xs:element name="getCountryResponse">
-        <xs:complexType>
-            <xs:sequence>
-                <xs:element name="country" type="tns:country"/>
-            </xs:sequence>
-        </xs:complexType>
-    </xs:element>
-
-    <xs:complexType name="country">
+    <xs:complexType name="message">
         <xs:sequence>
-            <xs:element name="name" type="xs:string"/>
-            <xs:element name="population" type="xs:int"/>
-            <xs:element name="capital" type="xs:string"/>
-            <xs:element name="currency" type="tns:currency"/>
+            <xs:element name="when" type="xs:dateTime"/>
+            <xs:element name="message" type="xs:string"/>
         </xs:sequence>
     </xs:complexType>
 
-    <xs:simpleType name="currency">
-        <xs:restriction base="xs:string">
-            <xs:enumeration value="GBP"/>
-            <xs:enumeration value="EUR"/>
-            <xs:enumeration value="PLN"/>
-        </xs:restriction>
-    </xs:simpleType>
 </xs:schema>
