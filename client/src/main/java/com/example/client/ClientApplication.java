@@ -38,121 +38,125 @@ import java.util.Objects;
 @ImportRuntimeHints(ClientApplication.Hints.class)
 public class ClientApplication {
 
-	static class Hints implements RuntimeHintsRegistrar {
+    static class Hints implements RuntimeHintsRegistrar {
 
-		@Override
-		public void registerHints(@NonNull RuntimeHints hints, @Nullable ClassLoader classLoader) {
-			for (var t : JAXB_CLASSES)
-				hints.reflection().registerType(t, MemberCategory.values());
-		}
+        @Override
+        public void registerHints(@NonNull RuntimeHints hints, @Nullable ClassLoader classLoader) {
+            for (var t : JAXB)
+                hints.reflection().registerType(t, MemberCategory.values());
+        }
+    }
 
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(ClientApplication.class, args);
+    }
 
-	public static void main(String[] args) {
-		SpringApplication.run(ClientApplication.class, args);
-	}
+    static final Class<?>[] JAXB = new Class[]{
+            MessageRequest.class,
+            MessageResponse.class
+    };
 
-	static final Class<?>[] JAXB_CLASSES = new Class<?>[] { MessageResponse.class, MessageRequest.class, };
 
-	@Bean
-	Jaxb2Marshaller jaxb2Marshaller() {
-		var marshaller = new Jaxb2Marshaller();
-		marshaller.setClassesToBeBound(JAXB_CLASSES);
-		return marshaller;
-	}
+    @Bean
+    Jaxb2Marshaller marshaller() {
+        var marshaller = new Jaxb2Marshaller();
+        marshaller.setClassesToBeBound(JAXB);
+        return marshaller;
+    }
 
-	@Bean
-	WebServiceTemplate webServiceTemplate(Jaxb2Marshaller marshaller, ClientInterceptor[] interceptors,
-			WebServiceTemplateBuilder builder) {
-		return builder ///
-			.interceptors(interceptors) //
-			.setMarshaller(marshaller)
-			.setUnmarshaller(marshaller)
-			.setDefaultUri("http://localhost:8080/ws")
-			.build();
-	}
-
+    @Bean
+    WebServiceTemplate webServiceTemplate(
+            Jaxb2Marshaller marshaller,
+            OAuthTokenClientInterceptor oAuthTokenClientInterceptor,
+            WebServiceTemplateBuilder builder) {
+        return builder
+                .setDefaultUri("http://localhost:8080/ws")
+                .interceptors(oAuthTokenClientInterceptor)
+                .setUnmarshaller(marshaller)
+                .setMarshaller(marshaller)
+                .build();
+    }
 }
 
 @Component
 class OAuthTokenClientInterceptor implements ClientInterceptor {
 
-	private final SecurityContextHolderStrategy strategy = SecurityContextHolder.getContextHolderStrategy();
+    private final SecurityContextHolderStrategy strategy = SecurityContextHolder.getContextHolderStrategy();
 
-	private final OAuth2AuthorizedClientManager authorizedClientManager;
+    private final OAuth2AuthorizedClientManager authorizedClientManager;
 
-	OAuthTokenClientInterceptor(OAuth2AuthorizedClientManager authorizedClientManager) {
-		this.authorizedClientManager = authorizedClientManager;
-	}
+    OAuthTokenClientInterceptor(OAuth2AuthorizedClientManager authorizedClientManager) {
+        this.authorizedClientManager = authorizedClientManager;
+    }
 
-	@Override
-	public boolean handleRequest(@NonNull MessageContext messageContext) throws WebServiceClientException {
-		try {
-			var jwt = this.jwt();
-			if (messageContext.getRequest() instanceof SaajSoapMessage sm) {
-				var env = sm.getSaajMessage().getSOAPPart().getEnvelope();
-				if (env.getHeader() == null)
-					env.addHeader();
-				var security = env.getHeader().addHeaderElement(env.createName("Security", WSConstants.WSSE_NS));
-				var bst = security.addChildElement(env.createName("BinarySecurityToken", WSConstants.WSSE_NS));
-				bst.setTextContent(Base64.getEncoder()
-					.encodeToString(Objects.requireNonNull(jwt).getBytes(StandardCharsets.UTF_8)));
-			}
-		} //
-		catch (SOAPException e) {
-			throw new RuntimeException(e);
-		}
-		return true;
-	}
+    @Override
+    public boolean handleRequest(@NonNull MessageContext messageContext) throws WebServiceClientException {
+        try {
+            var jwt = this.jwt();
+            if (messageContext.getRequest() instanceof SaajSoapMessage saajSoapMessage) {
+                var envelope = saajSoapMessage.getSaajMessage().getSOAPPart().getEnvelope();
+                var header = envelope.getHeader();
+                if (header == null) envelope.addHeader();
+                var securityElement = envelope.getHeader().addHeaderElement(
+                        envelope.createName("Security", WSConstants.WSSE_NS)
+                );
+                var bstElement = securityElement
+                        .addChildElement(envelope.createName("BinarySecurityToken", WSConstants.WSSE_NS));
+                bstElement.setTextContent(Base64.getEncoder().encodeToString(jwt.getBytes(StandardCharsets.UTF_8)));
+                return true;
+            }
+        }//
+        catch (SOAPException e) {
+            throw new RuntimeException(e);
+        }
+        return false;
+    }
 
-	private String jwt() {
-		var auth = this.strategy.getContext().getAuthentication();
-		if (auth instanceof OAuth2AuthenticationToken oAuth2AuthenticationToken) {
-			var request = OAuth2AuthorizeRequest
-				.withClientRegistrationId(oAuth2AuthenticationToken.getAuthorizedClientRegistrationId())
-				.principal(auth)
-				.build();
-			var authorized = this.authorizedClientManager.authorize(request);
-			if (authorized != null) {
-				return authorized.getAccessToken().getTokenValue();
-			}
-		}
-		return null;
-	}
+    private String jwt() {
+        var auth = this.strategy.getContext().getAuthentication();
+        if (auth instanceof OAuth2AuthenticationToken auth2AuthenticationToken) {
+            var clientId = auth2AuthenticationToken.getAuthorizedClientRegistrationId();
+            var request = OAuth2AuthorizeRequest
+                    .withClientRegistrationId(clientId)
+                    .principal(auth2AuthenticationToken)
+                    .build();
+            var authorizedClient = this.authorizedClientManager.authorize(request);
+            return Objects.requireNonNull(authorizedClient).getAccessToken().getTokenValue();
+        }
+        throw new IllegalStateException("could not install JWT token!");
+    }
 
-	@Override
-	public boolean handleResponse(@NonNull MessageContext messageContext) throws WebServiceClientException {
-		return true;
-	}
+    @Override
+    public boolean handleResponse(@NonNull MessageContext messageContext) throws WebServiceClientException {
+        return true;
+    }
 
-	@Override
-	public boolean handleFault(@NonNull MessageContext messageContext) throws WebServiceClientException {
-		return true;
-	}
+    @Override
+    public boolean handleFault(@NonNull MessageContext messageContext) throws WebServiceClientException {
+        return true;
+    }
 
-	@Override
-	public void afterCompletion(@NonNull MessageContext messageContext, @Nullable Exception ex)
-			throws WebServiceClientException {
+    @Override
+    public void afterCompletion(@NonNull MessageContext messageContext, @Nullable Exception ex) throws WebServiceClientException {
 
-	}
-
+    }
 }
 
 @Controller
 @ResponseBody
 class ClientController {
 
-	private final WebServiceTemplate ws;
+    private final WebServiceTemplate ws;
 
-	ClientController(WebServiceTemplate ws) {
-		this.ws = ws;
-	}
+    ClientController(WebServiceTemplate ws) {
+        this.ws = ws;
+    }
 
-	@GetMapping("/message")
-	MessageResponse message() {
-		var message = new MessageRequest();
-		message.setName("Bob");
-		return (MessageResponse) this.ws.marshalSendAndReceive(message);
-	}
+    @GetMapping("/message")
+    MessageResponse message() {
+        var request = new MessageRequest();
+        request.setName("Spring Fans!");
+        return (MessageResponse) this.ws.marshalSendAndReceive(request);
+    }
 
 }

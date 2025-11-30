@@ -41,53 +41,57 @@ public class WsApplication {
     }
 
     static final String NS = "http://example.com/ws";
-
 }
 
-
 @Component
-class OAuthTokenInterceptor implements EndpointInterceptor {
+class OAuthEndpointInterceptor implements EndpointInterceptor {
 
-    private final SecurityContextHolderStrategy securityContextHolder = SecurityContextHolder
-            .getContextHolderStrategy();
+    private final SecurityContextHolderStrategy strategy =
+            SecurityContextHolder.getContextHolderStrategy();
 
     private final AuthenticationProvider authenticationProvider;
 
-    OAuthTokenInterceptor(AuthenticationProvider authenticationProvider) {
+    OAuthEndpointInterceptor(AuthenticationProvider authenticationProvider) {
         this.authenticationProvider = authenticationProvider;
     }
 
     @Override
     public boolean handleRequest(@NonNull MessageContext messageContext, @NonNull Object endpoint) throws Exception {
-        if (messageContext.getRequest() instanceof SaajSoapMessage soapMessage) {
-            var token = this.jwt(soapMessage);
-            var bearerAuthentication = new BearerTokenAuthenticationToken(token);
-            var authenticated = Objects.requireNonNull(this.authenticationProvider.authenticate(bearerAuthentication));
-            if (authenticated.isAuthenticated()) {
-                this.securityContextHolder.getContext().setAuthentication(authenticated);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private String jwt(SaajSoapMessage soapMessage) throws Exception {
-        var header = soapMessage.getSaajMessage().getSOAPHeader();
-        var all = header.examineAllHeaderElements();
-        while (all.hasNext()) {
-            var next = all.next();
-            if (next.getLocalName().equals("Security")) {
-                var children = next.getChildElements();
-                while (children.hasNext()) {
-                    var child = children.next();
-                    if (child.getLocalName().equals("BinarySecurityToken")) {
-                        return new String(Base64.getDecoder().decode(child.getTextContent()),
-                                StandardCharsets.UTF_8);
+        if (messageContext.getRequest() instanceof SaajSoapMessage saajSoapMessage) {
+            var sm = saajSoapMessage.getSaajMessage();
+            var header = sm.getSOAPHeader();
+            var elements = header.examineAllHeaderElements();
+            while (elements.hasNext()) {
+                var next = elements.next();
+                if (next.getLocalName().equals("Security")) {
+                    var children = next.getChildElements();
+                    while (children.hasNext()) {
+                        var child = children.next();
+                        if (child.getLocalName().equals("BinarySecurityToken")) {
+                            var text = child.getTextContent();
+                            var jwt = new String(
+                                    Base64.getDecoder().decode(text), StandardCharsets.UTF_8);
+                            var bearerTokenAuthentication = new BearerTokenAuthenticationToken(jwt);
+                            var authenticated =
+                                    this.authenticationProvider.authenticate(bearerTokenAuthentication);
+                            if (Objects.requireNonNull(authenticated).isAuthenticated()) {
+                                this.strategy.getContext().setAuthentication(authenticated);
+                                return true;
+                            }
+                        }
                     }
                 }
             }
+            // find Security
+            // find BinarySecurityToken
+            // extract the text value
+            // Base64 decode
+            // turn into JWT
+            // validate it using AP
+            // install in SCH
         }
-        throw new IllegalStateException("no JWT!");
+
+        return false;
     }
 
     @Override
@@ -101,30 +105,29 @@ class OAuthTokenInterceptor implements EndpointInterceptor {
     }
 
     @Override
-    public void afterCompletion(@NonNull MessageContext messageContext, @NonNull Object endpoint,
-                                @Nullable Exception ex) throws Exception {
-        this.securityContextHolder.clearContext();
+    public void afterCompletion(@NonNull MessageContext messageContext, @NonNull Object endpoint, @Nullable Exception ex) throws Exception {
+        strategy.clearContext();
     }
-
 }
 
 @Configuration
-class SecurityConfiguration implements WsConfigurer {
+class EndpointSecurityConfiguration implements WsConfigurer {
 
-    private final ObjectProvider<@NonNull EndpointInterceptor> oAuthTokenInterceptors;
+    // resource server
+    // - configure an EndpointInterceptor to extract token and validate it
+    // - install a authentication into SCH
 
-    SecurityConfiguration(ObjectProvider<@NonNull EndpointInterceptor> oAuthTokenInterceptors) {
-        this.oAuthTokenInterceptors = oAuthTokenInterceptors;
-    }
 
-    @Override
-    public void addInterceptors(@NonNull List<EndpointInterceptor> interceptors) {
-        interceptors.add(this.oAuthTokenInterceptors.getIfAvailable());
+    private final ObjectProvider<@NonNull OAuthEndpointInterceptor> oAuthEndpointInterceptor;
+
+    EndpointSecurityConfiguration(ObjectProvider<@NonNull OAuthEndpointInterceptor> oAuthEndpointInterceptor) {
+        this.oAuthEndpointInterceptor = oAuthEndpointInterceptor;
     }
 
     @Bean
-    JwtDecoder jwtDecoder(@Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuerUri) {
-        return NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
+    JwtDecoder jwtDecoder(@Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String uriOfIssuer) {
+        return NimbusJwtDecoder.withIssuerLocation(uriOfIssuer)
+                .build();
     }
 
     @Bean
@@ -133,27 +136,32 @@ class SecurityConfiguration implements WsConfigurer {
     }
 
     @Bean
-    Customizer<HttpSecurity> httpSecurityCustomizer(@Value("${spring.webservices.path}") String path) {
-        return http -> http
-                .authorizeHttpRequests(a -> a.requestMatchers(path).permitAll()) //
-                .csrf(AbstractHttpConfigurer::disable);
+    Customizer<HttpSecurity> httpSecurityCustomizer() {
+        return h -> h
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(ar -> ar.requestMatchers("/ws").permitAll());
     }
 
+    @Override
+    public void addInterceptors(@NonNull List<EndpointInterceptor> interceptors) {
+        interceptors.add(oAuthEndpointInterceptor.getIfAvailable());
+    }
 }
+
 
 @Endpoint
 class MessageEndpoint {
 
-    private final SecurityContextHolderStrategy securityContextHolderStrategy = SecurityContextHolder
-            .getContextHolderStrategy();
-
-    @ResponsePayload
     @PayloadRoot(namespace = WsApplication.NS, localPart = "messageRequest")
+    @ResponsePayload
     MessageResponse message(@RequestPayload MessageRequest request) {
-        var authentication = this.securityContextHolderStrategy.getContext().getAuthentication();
-        var mr = new MessageResponse();
-        mr.setMessage("hello, " + Objects.requireNonNull(authentication).getName());
-        return mr;
+        var authenticatedName = SecurityContextHolder
+                .getContextHolderStrategy()
+                .getContext()
+                .getAuthentication()
+                .getName();
+        var response = new MessageResponse();
+        response.setMessage("hello, " + authenticatedName );
+        return response;
     }
-
 }

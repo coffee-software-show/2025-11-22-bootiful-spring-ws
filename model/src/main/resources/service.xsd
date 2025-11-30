@@ -2,18 +2,25 @@
            targetNamespace="http://example.com/ws"
            elementFormDefault="qualified">
 
-    <xs:element name="messageResponse">
+    <!--
+        messageRequest
+            name: string
+
+        messageResponse:
+            message: string
+    -->
+    <xs:element name="messageRequest">
         <xs:complexType>
             <xs:sequence>
-                <xs:element name="message" type="xs:string"/>
+                <xs:element minOccurs="0" type="xs:string" name="name"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>
 
-    <xs:element name="messageRequest">
+    <xs:element name="messageResponse">
         <xs:complexType>
             <xs:sequence>
-                <xs:element minOccurs="0" name="name" type="xs:string"/>
+                <xs:element type="xs:string" name="message"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>

@@ -20,27 +20,31 @@ public class AuthApplication {
     }
 
     @Bean
+    Customizer<HttpSecurity> httpSecurityCustomizer() {
+        return h -> h
+            .oauth2AuthorizationServer(a -> a.oidc(Customizer.withDefaults()));
+    }
+
+    @Bean
     PasswordEncoder passwordEncoder() {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
     @Bean
-    InMemoryUserDetailsManager userDetailsManager(PasswordEncoder pw) {
+    InMemoryUserDetailsManager inMemoryUserDetailsManager(PasswordEncoder pw) {
         var users = Stream
                 .of("josh", "greg", "stephane", "arjen")
-                .map(username -> User.withUsername(username)
-                        .password(pw.encode("pw"))
+                .map(us -> User.withUsername(us)
                         .roles("USER")
-                        .build()
-                )
+                        .password(pw.encode("pw"))
+                        .build())
                 .toList();
         return new InMemoryUserDetailsManager(users);
     }
 
-    @Bean
-    Customizer<HttpSecurity> httpSecurityCustomizer() {
-        return http -> http
-                .oauth2AuthorizationServer(a -> a.oidc(Customizer.withDefaults()));
-    }
-
+    // 1. usernames/passwords (form, http basic)
+    // 2. x509 mutual tls
+    // 3. one time tokens
+    // 4. passkeys (webauthn)
+    // 5. MFA
 }
