@@ -62,9 +62,8 @@ public class ClientApplication {
 	}
 
 	@Bean
-	WebServiceTemplate webServiceTemplate(
-
-			Jaxb2Marshaller marshaller, ClientInterceptor[] interceptors, WebServiceTemplateBuilder builder) {
+	WebServiceTemplate webServiceTemplate(Jaxb2Marshaller marshaller, ClientInterceptor[] interceptors,
+			WebServiceTemplateBuilder builder) {
 		return builder ///
 			.interceptors(interceptors) //
 			.setMarshaller(marshaller)
