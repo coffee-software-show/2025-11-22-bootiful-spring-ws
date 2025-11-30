@@ -3,6 +3,7 @@ package com.example.client;
 import com.example.ws.MessageRequest;
 import com.example.ws.MessageResponse;
 import jakarta.xml.soap.SOAPException;
+import org.apache.wss4j.dom.WSConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.aot.hint.MemberCategory;
@@ -27,12 +28,15 @@ import org.springframework.ws.client.WebServiceClientException;
 import org.springframework.ws.client.core.WebServiceTemplate;
 import org.springframework.ws.client.support.interceptor.ClientInterceptor;
 import org.springframework.ws.context.MessageContext;
+import org.springframework.ws.soap.SoapMessage;
 import org.springframework.ws.soap.saaj.SaajSoapMessage;
+import org.springframework.ws.soap.security.AbstractWsSecurityInterceptor;
+import org.springframework.ws.soap.security.WsSecuritySecurementException;
+import org.springframework.ws.soap.security.WsSecurityValidationException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Objects;
-import java.util.UUID;
 
 
 @SpringBootApplication
@@ -53,8 +57,8 @@ public class ClientApplication {
     }
 
     static final Class<?>[] JAXB_CLASSES = new Class<?>[]{
-         MessageResponse.class,
-         MessageRequest.class,
+            MessageResponse.class,
+            MessageRequest.class,
     };
 
     @Bean
@@ -78,16 +82,9 @@ public class ClientApplication {
     }
 }
 
+
 @Component
 class OAuthClientInterceptor implements ClientInterceptor {
-
-    private static final String WSSE_NS = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd";
-
-    private static final String WSU_NS = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd";
-
-    private static final String ENCODING_TYPE = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary";
-
-    private static final String VALUE_TYPE_JWT = "urn:ietf:params:oauth:token-type:jwt";
 
     private final SecurityContextHolderStrategy securityContextHolderStrategy =
             SecurityContextHolder.getContextHolderStrategy();
@@ -113,48 +110,23 @@ class OAuthClientInterceptor implements ClientInterceptor {
             var accessToken = Objects.requireNonNull(authorize).getAccessToken();
             var jwt = accessToken.getTokenValue();
             try {
-                this.addBinarySecurityToken(saajSoapMessage, jwt);
+                var soapMessage = saajSoapMessage.getSaajMessage();
+                var envelope = soapMessage.getSOAPPart().getEnvelope();
+                var header = envelope.getHeader();
+                if (header == null)
+                    header = envelope.addHeader();
+                var securityHeader = header.addHeaderElement(envelope.createName("Security", "wsse", WSConstants.WSSE_NS));
+                var binarySecurityToken = securityHeader.addChildElement(envelope.createName("BinarySecurityToken", "wsse", WSConstants.WSSE_NS));
+                var encoded = Base64.getEncoder().encodeToString(jwt.getBytes(StandardCharsets.UTF_8));
+                binarySecurityToken.addTextNode(encoded);
                 return true;
             } //
             catch (SOAPException e) {
                 throw new RuntimeException(e);
             }
-            // todo add to outgoing request destined for Spring WS endpoint on :8080
         }
         return false;
     }
-
-
-    private void addBinarySecurityToken(SaajSoapMessage saajMessage, String jwt) throws SOAPException {
-        var soapMessage = saajMessage.getSaajMessage();
-        var envelope = soapMessage.getSOAPPart().getEnvelope();
-        var header = envelope.getHeader();
-        if (header == null) {
-            header = envelope.addHeader();
-        }
-
-        // wsse:Security
-        var securityName = envelope.createName("Security", "wsse", WSSE_NS);
-        var securityHeader = header.addHeaderElement(securityName);
-
-        // wsse:BinarySecurityToken
-        var bstName = envelope.createName("BinarySecurityToken", "wsse", WSSE_NS);
-        var bst = securityHeader.addChildElement(bstName);
-
-        // Attributes
-        bst.addAttribute(envelope.createName("ValueType"), VALUE_TYPE_JWT);
-        bst.addAttribute(envelope.createName("EncodingType"), ENCODING_TYPE);
-
-        // wsu:Id attribute
-        var wsuIdName = envelope.createName("Id", "wsu", WSU_NS);
-        bst.addAttribute(wsuIdName, "jwt-" + UUID.randomUUID());
-
-        // Value: base64(jwt bytes) so that on the server side
-        // binarySecurityToken.getToken() returns the original jwt bytes
-        var encoded = Base64.getEncoder().encodeToString(jwt.getBytes(StandardCharsets.UTF_8));
-        bst.addTextNode(encoded);
-    }
-
 
     @Override
     public boolean handleResponse(@NonNull MessageContext messageContext) throws WebServiceClientException {
@@ -168,7 +140,6 @@ class OAuthClientInterceptor implements ClientInterceptor {
 
     @Override
     public void afterCompletion(@NonNull MessageContext messageContext, @Nullable Exception ex) throws WebServiceClientException {
-
     }
 }
 
