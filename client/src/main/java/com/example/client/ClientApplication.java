@@ -1,6 +1,7 @@
 package com.example.client;
 
-import com.example.ws.*;
+import com.example.ws.MessageRequest;
+import com.example.ws.MessageResponse;
 import jakarta.xml.soap.SOAPException;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -27,10 +28,7 @@ import org.springframework.ws.client.core.WebServiceTemplate;
 import org.springframework.ws.client.support.interceptor.ClientInterceptor;
 import org.springframework.ws.context.MessageContext;
 import org.springframework.ws.soap.saaj.SaajSoapMessage;
-import org.springframework.xml.transform.StringResult;
 
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.transform.dom.DOMSource;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Objects;
@@ -55,11 +53,8 @@ public class ClientApplication {
     }
 
     static final Class<?>[] JAXB_CLASSES = new Class<?>[]{
-            GetCountryResponse.class,
-            GetCountryRequest.class,
-            Currency.class,
-            GetMeResponse.class,
-            Country.class
+         MessageResponse.class,
+         MessageRequest.class,
     };
 
     @Bean
@@ -187,21 +182,10 @@ class ClientController {
         this.ws = ws;
     }
 
-    @GetMapping("/me")
-    String me() throws Exception {
-        var document = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
-        var element = document.createElementNS("http://example.com/ws", "getMeRequest");
-        var source = new DOMSource(element);
-        var result = new StringResult();
-        this.ws.sendSourceAndReceiveToResult(source, result);
-        return result.toString();
-    }
-
-    @GetMapping("/country")
-    GetCountryResponse country() {
-        var getCountryRequest = new GetCountryRequest();
-        getCountryRequest.setName("United Kingdom");
-        return (GetCountryResponse)
-                this.ws.marshalSendAndReceive(getCountryRequest);
+    @GetMapping("/message")
+    MessageResponse message() {
+        var message = new MessageRequest();
+        message.setName("Bob");
+        return (MessageResponse) this.ws.marshalSendAndReceive(message);
     }
 }
