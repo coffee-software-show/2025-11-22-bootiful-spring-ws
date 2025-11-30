@@ -28,11 +28,7 @@ import org.springframework.ws.client.WebServiceClientException;
 import org.springframework.ws.client.core.WebServiceTemplate;
 import org.springframework.ws.client.support.interceptor.ClientInterceptor;
 import org.springframework.ws.context.MessageContext;
-import org.springframework.ws.soap.SoapMessage;
 import org.springframework.ws.soap.saaj.SaajSoapMessage;
-import org.springframework.ws.soap.security.AbstractWsSecurityInterceptor;
-import org.springframework.ws.soap.security.WsSecuritySecurementException;
-import org.springframework.ws.soap.security.WsSecurityValidationException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -66,9 +62,11 @@ public class ClientApplication {
 	}
 
 	@Bean
-	WebServiceTemplate webServiceTemplate(Jaxb2Marshaller marshaller, OAuthClientInterceptor interceptor,
-			WebServiceTemplateBuilder builder) {
-		return builder.interceptors(interceptor)
+	WebServiceTemplate webServiceTemplate(
+
+			Jaxb2Marshaller marshaller, ClientInterceptor[] interceptors, WebServiceTemplateBuilder builder) {
+		return builder ///
+			.interceptors(interceptors) //
 			.setMarshaller(marshaller)
 			.setUnmarshaller(marshaller)
 			.setDefaultUri("http://localhost:8080/ws")
@@ -78,46 +76,49 @@ public class ClientApplication {
 }
 
 @Component
-class OAuthClientInterceptor implements ClientInterceptor {
+class OAuthTokenClientInterceptor implements ClientInterceptor {
 
-	private final SecurityContextHolderStrategy securityContextHolderStrategy = SecurityContextHolder
-		.getContextHolderStrategy();
+	private final SecurityContextHolderStrategy strategy = SecurityContextHolder.getContextHolderStrategy();
 
 	private final OAuth2AuthorizedClientManager authorizedClientManager;
 
-	OAuthClientInterceptor(OAuth2AuthorizedClientManager authorizedClientManager) {
+	OAuthTokenClientInterceptor(OAuth2AuthorizedClientManager authorizedClientManager) {
 		this.authorizedClientManager = authorizedClientManager;
 	}
 
 	@Override
 	public boolean handleRequest(@NonNull MessageContext messageContext) throws WebServiceClientException {
-		var principal = this.securityContextHolderStrategy.getContext().getAuthentication();
-		if (principal instanceof OAuth2AuthenticationToken oAuth2AuthenticationToken
-				&& messageContext.getRequest() instanceof SaajSoapMessage saajSoapMessage) {
-			var registeredClient = oAuth2AuthenticationToken.getAuthorizedClientRegistrationId();
-			var token = OAuth2AuthorizeRequest.withClientRegistrationId(registeredClient).principal(principal).build();
-			var authorize = this.authorizedClientManager.authorize(token);
-			var accessToken = Objects.requireNonNull(authorize).getAccessToken();
-			var jwt = accessToken.getTokenValue();
-			try {
-				var soapMessage = saajSoapMessage.getSaajMessage();
-				var envelope = soapMessage.getSOAPPart().getEnvelope();
-				var header = envelope.getHeader();
-				if (header == null)
-					header = envelope.addHeader();
-				var securityHeader = header
-					.addHeaderElement(envelope.createName("Security", "wsse", WSConstants.WSSE_NS));
-				var binarySecurityToken = securityHeader
-					.addChildElement(envelope.createName("BinarySecurityToken", "wsse", WSConstants.WSSE_NS));
-				var encoded = Base64.getEncoder().encodeToString(jwt.getBytes(StandardCharsets.UTF_8));
-				binarySecurityToken.addTextNode(encoded);
-				return true;
-			} //
-			catch (SOAPException e) {
-				throw new RuntimeException(e);
+		try {
+			var jwt = this.jwt();
+			if (messageContext.getRequest() instanceof SaajSoapMessage sm) {
+				var env = sm.getSaajMessage().getSOAPPart().getEnvelope();
+				if (env.getHeader() == null)
+					env.addHeader();
+				var security = env.getHeader().addHeaderElement(env.createName("Security", WSConstants.WSSE_NS));
+				var bst = security.addChildElement(env.createName("BinarySecurityToken", WSConstants.WSSE_NS));
+				bst.setTextContent(Base64.getEncoder()
+					.encodeToString(Objects.requireNonNull(jwt).getBytes(StandardCharsets.UTF_8)));
+			}
+		} //
+		catch (SOAPException e) {
+			throw new RuntimeException(e);
+		}
+		return true;
+	}
+
+	private String jwt() {
+		var auth = this.strategy.getContext().getAuthentication();
+		if (auth instanceof OAuth2AuthenticationToken oAuth2AuthenticationToken) {
+			var request = OAuth2AuthorizeRequest
+				.withClientRegistrationId(oAuth2AuthenticationToken.getAuthorizedClientRegistrationId())
+				.principal(auth)
+				.build();
+			var authorized = this.authorizedClientManager.authorize(request);
+			if (authorized != null) {
+				return authorized.getAccessToken().getTokenValue();
 			}
 		}
-		return false;
+		return null;
 	}
 
 	@Override
@@ -133,6 +134,7 @@ class OAuthClientInterceptor implements ClientInterceptor {
 	@Override
 	public void afterCompletion(@NonNull MessageContext messageContext, @Nullable Exception ex)
 			throws WebServiceClientException {
+
 	}
 
 }
